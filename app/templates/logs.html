@@ -82,12 +82,19 @@
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 text-center align-middle">
-                        <button
-                            onclick="window.SentinelsShowIPDetails && window.SentinelsShowIPDetails('{{ threat.source_ip }}')"
-                            class="p-2 text-gray-400 hover:text-primary hover:bg-primary/10 rounded transition-colors inline-flex items-center justify-center"
-                            title="Inspect IP">
-                            <span class="material-symbols-outlined text-sm">search</span>
-                        </button>
+                        <div class="flex items-center justify-center gap-2">
+                            <button onclick="showThreatDetails('{{ threat.id }}')"
+                                class="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors inline-flex items-center justify-center"
+                                title="View Packet Details">
+                                <span class="material-symbols-outlined text-sm">visibility</span>
+                            </button>
+                            <button
+                                onclick="window.SentinelsShowIPDetails && window.SentinelsShowIPDetails('{{ threat.source_ip }}')"
+                                class="p-2 text-gray-400 hover:text-primary hover:bg-primary/10 rounded transition-colors inline-flex items-center justify-center"
+                                title="Inspect IP">
+                                <span class="material-symbols-outlined text-sm">search</span>
+                            </button>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -116,117 +123,57 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/logs.js') }}"></script>
 <script>
-    // Standalone Deep Dive function for Threat Logs page
-    window.SentinelsShowIPDetails = function (ip) {
-        if (!ip || ip === '—') return;
+    async function showThreatDetails(threatId) {
+        if (!threatId) return;
 
-        // Create and show modal
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
-        modal.id = 'deep-dive-modal';
-        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        // Show loading state first
+        window.SentinelsGlobal.showModal('Packet Details', '<p class="text-gray-400 p-4">Loading threat details...</p>', null);
 
-        modal.innerHTML = `
-        <div class="bg-surface border border-[#333] rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold text-white">Deep Dive: ${ip}</h3>
-                <button onclick="document.getElementById('deep-dive-modal').remove()" 
-                    class="text-gray-400 hover:text-white">
-                    <span class="material-symbols-outlined">close</span>
-                </button>
-            </div>
-            <div id="modal-content" class="space-y-4">
-                <div class="flex items-center justify-center py-8">
-                    <span class="material-symbols-outlined animate-spin text-primary">autorenew</span>
-                    <span class="ml-2 text-gray-400">Loading...</span>
-                </div>
-            </div>
-        </div>
-    `;
-        document.body.appendChild(modal);
+        try {
+            const res = await fetch(`/api/threat/${threatId}`);
+            const data = await res.json();
 
-        // Fetch packet data and geo data in parallel
-        Promise.all([
-            fetch('/api/packets?limit=50000').then(res => res.json()),
-            fetch(`/api/geo/${ip}`).then(res => res.json())
-        ])
-            .then(([packetData, geoData]) => {
-                const content = document.getElementById('modal-content');
+            if (data.success && data.threat) {
+                const threat = data.threat;
+                const payload = threat.payload || 'No payload data captured with this threat.';
 
-                if (!packetData.success || !packetData.packets) {
-                    content.innerHTML = '<p class="text-gray-400">No packet data available</p>';
-                    return;
-                }
-
-                // Process packet data
-                const ipPackets = packetData.packets.filter(p => p.src_ip === ip || p.dst_ip === ip);
-                const protocols = {};
-                ipPackets.forEach(p => {
-                    const proto = (p.protocol || 'OTHER').toUpperCase();
-                    protocols[proto] = (protocols[proto] || 0) + 1;
-                });
-
-                const total = Object.values(protocols).reduce((a, b) => a + b, 0) || 1;
-                const bars = Object.entries(protocols)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([proto, count]) => {
-                        const pct = ((count / total) * 100).toFixed(1);
-                        const color = proto === 'TCP' ? '#0df269' : proto === 'UDP' ? '#3b82f6' : '#888';
-                        return `
-                        <div class="flex items-center gap-2">
-                            <span class="w-12 text-xs text-gray-400">${proto}</span>
-                            <div class="flex-1 bg-[#222] rounded h-2 overflow-hidden">
-                                <div class="h-full rounded" style="width: ${pct}%; background: ${color}"></div>
+                const html = `
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div class="bg-background rounded-lg p-3">
+                                <p class="text-gray-500 text-xs uppercase">Source</p>
+                                <p class="text-primary font-mono">${threat.source_ip}</p>
                             </div>
-                            <span class="w-12 text-xs text-gray-300 text-right">${pct}%</span>
+                            <div class="bg-background rounded-lg p-3">
+                                <p class="text-gray-500 text-xs uppercase">Destination</p>
+                                <p class="text-white font-mono">${threat.destination_ip || '—'}</p>
+                            </div>
+                            <div class="bg-background rounded-lg p-3">
+                                <p class="text-gray-500 text-xs uppercase">Protocol</p>
+                                <p class="text-white font-bold">${threat.protocol}</p>
+                            </div>
+                            <div class="bg-background rounded-lg p-3">
+                                <p class="text-gray-500 text-xs uppercase">Severity</p>
+                                <p class="${threat.severity == 'CRITICAL' ? 'text-danger' : 'text-yellow-500'} font-bold">${threat.severity}</p>
+                            </div>
                         </div>
-                    `;
-                    }).join('');
-
-                // Process Geo Data
-                let flag = '🌐';
-                let location = 'Unknown, Unknown';
-
-                if (geoData.success && geoData.geo) {
-                    flag = geoData.geo.flag || '🌐';
-                    // If private IP (local network)
-                    if (geoData.geo.country === 'LAN') {
-                        flag = '💻';
-                        location = 'Local Network';
-                    } else if (geoData.geo.country !== 'Unknown') {
-                        location = `${geoData.geo.city}, ${geoData.geo.country}`;
-                    }
-                }
-
-                content.innerHTML = `
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-[#111] p-3 rounded border border-[#333]">
-                        <span class="text-xs text-gray-500 uppercase block mb-1">IP Address</span>
-                        <div class="text-primary font-mono text-sm">${ip}</div>
+                        
+                        <div>
+                            <p class="text-gray-500 text-xs uppercase mb-2">Payload Data</p>
+                            <pre class="bg-background rounded-lg p-4 text-xs text-gray-300 font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-64 custom-scrollbar">${payload}</pre>
+                        </div>
                     </div>
-                    <div class="bg-[#111] p-3 rounded border border-[#333]">
-                        <span class="text-xs text-gray-500 uppercase block mb-1">Packets</span>
-                        <div class="text-white font-bold text-lg">${ipPackets.length.toLocaleString()}</div>
-                    </div>
-                </div>
-                <div class="bg-[#111] p-3 rounded border border-[#333]">
-                    <span class="text-xs text-gray-500 uppercase block mb-1">Location</span>
-                    <div class="text-white text-sm flex items-center gap-2">
-                        <span class="text-lg">${flag}</span>
-                        <span>${location}</span>
-                    </div>
-                </div>
-                <div class="bg-[#111] p-4 rounded border border-[#333]">
-                    <span class="text-xs text-gray-500 uppercase block mb-3">Protocol Breakdown</span>
-                    <div class="space-y-2">${bars || '<p class="text-gray-500 text-xs">No data</p>'}</div>
-                </div>
-            `;
-            })
-            .catch(err => {
-                console.error(err);
-                document.getElementById('modal-content').innerHTML =
-                    '<p class="text-danger">Error loading data</p>';
-            });
-    };
+                `;
+
+                // Update modal content
+                window.SentinelsGlobal.showModal('Threat Packet Details', html, null);
+            } else {
+                window.SentinelsGlobal.showModal('Error', '<p class="text-danger p-4">Threat details not found.</p>', null);
+            }
+        } catch (e) {
+            console.error(e);
+            window.SentinelsGlobal.showModal('Error', '<p class="text-danger p-4">Failed to load details.</p>', null);
+        }
+    }
 </script>
 {% endblock %}

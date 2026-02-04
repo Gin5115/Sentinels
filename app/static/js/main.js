@@ -626,12 +626,24 @@ document.addEventListener('DOMContentLoaded', () => {
             // Source
             const c2 = row.insertCell(1);
             c2.className = "py-2 font-mono text-primary";
-            c2.textContent = packet.src_ip || '-';
+            if (packet.src_ip && packet.src_ip !== '-') {
+                c2.innerHTML = `<span class="cursor-pointer hover:text-white hover:underline transition-colors" 
+                    onclick="window.SentinelsShowIPDetails && window.SentinelsShowIPDetails('${packet.src_ip}')"
+                    title="Deep Dive Source IP">${packet.src_ip}</span>`;
+            } else {
+                c2.textContent = '-';
+            }
 
             // Destination
             const c3 = row.insertCell(2);
             c3.className = "py-2 font-mono text-white";
-            c3.textContent = packet.dst_ip || '-';
+            if (packet.dst_ip && packet.dst_ip !== '-') {
+                c3.innerHTML = `<span class="cursor-pointer hover:text-primary hover:underline transition-colors" 
+                    onclick="window.SentinelsShowIPDetails && window.SentinelsShowIPDetails('${packet.dst_ip}')"
+                    title="Deep Dive Destination IP">${packet.dst_ip}</span>`;
+            } else {
+                c3.textContent = '-';
+            }
 
             // Protocol
             const c4 = row.insertCell(3);

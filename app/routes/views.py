@@ -118,16 +118,26 @@ def api_get_packets():
     Query params:
         offset: Starting index (default: 0, from newest)
         limit: Number of packets to return (default: 100, max: 50000)
+        ip: Optional IP address to filter by (Source OR Destination)
     """
     offset = request.args.get('offset', 0, type=int)
-    limit = min(request.args.get('limit', 100, type=int), 50000)  # Match buffer size
+    limit = min(request.args.get('limit', 100, type=int), 50000)
+    target_ip = request.args.get('ip')  # Optional filter
     
     # Convert deque to list for slicing (newest first)
-    packets_list = list(PACKET_BUFFER)
-    packets_list.reverse()  # Newest first
+    # Note: Creating a list from a large deque is O(N) but typically fast in RAM
+    all_packets = list(PACKET_BUFFER)
+    all_packets.reverse()  # Newest first
     
-    total = len(packets_list)
-    paginated = packets_list[offset:offset + limit]
+    # Filter by IP if requested (Server-side optimization)
+    if target_ip:
+        filtered_packets = [p for p in all_packets 
+                           if p.get('src_ip') == target_ip or p.get('dst_ip') == target_ip]
+        total = len(filtered_packets)
+        paginated = filtered_packets[offset:offset + limit]
+    else:
+        total = len(all_packets)
+        paginated = all_packets[offset:offset + limit]
     
     # Return LIGHTWEIGHT metadata only (no payload)
     lightweight_packets = [{
@@ -183,3 +193,24 @@ def api_resolve_geo(ip):
         'success': True,
         'geo': geo
     })
+
+
+@main_bp.route('/api/threat/<int:threat_id>')
+def api_get_threat_details(threat_id):
+    """
+    API endpoint to get FULL threat details including payload.
+    Used for the Threat Logs 'Packet Details' action.
+    """
+    from app.models.threat import get_threat_by_id
+    threat = get_threat_by_id(threat_id)
+    
+    if threat:
+        return jsonify({
+            'success': True,
+            'threat': threat
+        })
+    
+    return jsonify({
+        'success': False,
+        'error': 'Threat not found'
+    }), 404

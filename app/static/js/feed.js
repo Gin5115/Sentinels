@@ -259,8 +259,18 @@ document.addEventListener('DOMContentLoaded', () => {
         row.innerHTML = `
             <div class="w-16 px-4 py-2 font-mono text-gray-500 text-xs">${packetNumber}</div>
             <div class="w-24 px-4 py-2 font-mono text-gray-400">${time}</div>
-            <div class="flex-1 px-4 py-2 font-mono text-primary truncate">${packet.src_ip || '—'}</div>
-            <div class="flex-1 px-4 py-2 font-mono text-white truncate">${packet.dst_ip || '—'}</div>
+            <div class="flex-1 px-4 py-2 font-mono text-primary truncate">
+                ${packet.src_ip && packet.src_ip !== '—' ?
+                `<span class="cursor-pointer hover:text-white hover:underline transition-colors" 
+                  onclick="window.SentinelsShowIPDetails && window.SentinelsShowIPDetails('${packet.src_ip}')"
+                  title="Deep Dive Source IP">${packet.src_ip}</span>` : '—'}
+            </div>
+            <div class="flex-1 px-4 py-2 font-mono text-white truncate">
+                ${packet.dst_ip && packet.dst_ip !== '—' ?
+                `<span class="cursor-pointer hover:text-primary hover:underline transition-colors" 
+                  onclick="window.SentinelsShowIPDetails && window.SentinelsShowIPDetails('${packet.dst_ip}')"
+                  title="Deep Dive Destination IP">${packet.dst_ip}</span>` : '—'}
+            </div>
             <div class="w-20 px-4 py-2">
                 <span class="px-2 py-0.5 rounded text-xs font-bold border ${protocolClass}">${packet.protocol || '?'}</span>
             </div>

@@ -155,20 +155,42 @@ class PacketSniffer:
         if Raw in packet:
             try:
                 raw_bytes = bytes(packet[Raw].load)
-                # Try UTF-8 decode first
+                
+                # Attempt custom "Pretty Print" for mixed content
                 try:
-                    payload = raw_bytes.decode('utf-8', errors='ignore')
-                    # Check if it's mostly printable
-                    printable_ratio = sum(1 for c in payload if c.isprintable() or c.isspace()) / max(len(payload), 1)
-                    if printable_ratio < 0.7:
-                        # Too much binary data, use hex
-                        payload = raw_bytes[:50].hex()
-                except:
-                    payload = raw_bytes[:50].hex()
-                # Limit length
-                payload = payload[:100]
-            except:
-                payload = ''
+                    # 1. Try strict UTF-8 first
+                    decoded = raw_bytes.decode('utf-8', errors='strict')
+                    
+                    # If strictly valid UTF-8, check if it actually looks like text (no weird control chars)
+                    # We allow common whitespace (\n \r \t) but reject other low control codes
+                    is_clean_text = all(c.isprintable() or c in '\n\r\t' for c in decoded)
+                    
+                    if is_clean_text:
+                        payload = decoded
+                    else:
+                        raise ValueError("Contains control characters")
+
+                except (UnicodeDecodeError, ValueError):
+                    # 2. Fallback: Check if it's "mostly" text (e.g. HTTP with some binary headers)
+                    # We use a looser decode for analysis
+                    loose_decoded = raw_bytes.decode('utf-8', errors='replace')
+                    printable_count = sum(1 for c in loose_decoded if c.isprintable() or c in '\n\r\t')
+                    ratio = printable_count / max(len(loose_decoded), 1)
+                    
+                    if ratio > 0.90:  # Strict 90% threshold (was 0.7)
+                        payload = loose_decoded
+                    else:
+                        # 3. It's binary/encrypted. Return readable HEX.
+                        # Format: "Hex: 1A 2B 3C ..." for better readability
+                        hex_str = raw_bytes[:50].hex()
+                        # Insert space every 2 chars
+                        payload = 'Hex: ' + ' '.join(hex_str[i:i+2] for i in range(0, len(hex_str), 2)).upper()
+                
+                # Limit length for display
+                if len(payload) > 200:
+                    payload = payload[:200] + '...'
+            except Exception:
+                payload = '[Error extracting payload]'
         packet_data['payload'] = payload
         
         # Update traffic stats (backend persistence)
@@ -197,7 +219,8 @@ class PacketSniffer:
                 threat_type=heuristic_threat.get('type'),
                 severity=heuristic_threat.get('severity', 'Medium').upper(),
                 description=heuristic_threat.get('description'),
-                packet_size=packet_data.get('len')
+                packet_size=packet_data.get('len'),
+                payload=packet_data.get('payload')
             )
             
             # Emit threat alert via callback (will be handled by socket_events)
