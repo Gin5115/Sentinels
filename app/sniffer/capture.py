@@ -7,7 +7,6 @@ import threading
 from datetime import datetime
 
 from scapy.all import sniff, IP, IPv6, TCP, UDP, Ether, Raw, conf
-from scapy.arch.windows import get_windows_if_list
 
 from app.utils.stats_manager import traffic_stats
 from app.utils.threat_engine import get_threat_engine
