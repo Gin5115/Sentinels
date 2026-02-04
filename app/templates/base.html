@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>{% block title %}Sentinels{% endblock %}</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Theme Config -->
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0df269",
+                        "primary-dim": "#087532",
+                        "danger": "#ff2a2a",
+                        "surface": "#1a1a1a",
+                        "surface-highlight": "#252525",
+                        "background": "#0a0a0a",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Space Grotesk", "sans-serif"],
+                    },
+                    boxShadow: {
+                        "glow-green": "0 0 10px rgba(13, 242, 105, 0.3)",
+                        "glow-red": "0 0 15px rgba(255, 42, 42, 0.4)",
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0df269;
+        }
+
+        @keyframes scanline {
+            0% {
+                transform: translateY(-100%);
+            }
+
+            100% {
+                transform: translateY(100%);
+            }
+        }
+
+        .chart-glow {
+            filter: drop-shadow(0 0 4px #0df269);
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+
+<body class="bg-background text-white font-display antialiased selection:bg-primary selection:text-black">
+    <div class="flex min-h-screen w-full">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar"
+            class="fixed inset-y-0 left-0 z-50 w-64 h-screen flex flex-col bg-surface border-r border-[#333] transform -translate-x-full transition-transform duration-300 md:translate-x-0">
+            <!-- Section 1 (Top - Fixed) -->
+            <div class="shrink-0 h-16 flex items-center px-6 bg-surface border-b border-[#333]">
+                <div class="size-10 rounded bg-primary flex items-center justify-center text-black shadow-glow-green">
+                    <span class="material-symbols-outlined">shield_lock</span>
+                </div>
+                <div class="flex flex-col ml-3">
+                    <h1 class="text-white text-lg font-bold tracking-widest leading-none">SENTINELS</h1>
+                    <p class="text-primary text-[10px] tracking-[0.2em] font-medium mt-1">NETWORK MONITOR</p>
+                </div>
+            </div>
+
+            <!-- Section 2 (Middle - Scrollable) -->
+            <nav class="flex-1 overflow-y-auto py-4 px-4 flex flex-col gap-2">
+                {% set current_page = request.endpoint %}
+
+                <a class="flex items-center gap-4 px-3 py-3 rounded-lg transition-all
+                {% if current_page == 'main.index' %}bg-primary/10 border-l-2 border-primary text-primary
+                {% else %}text-gray-400 hover:text-white hover:bg-surface-highlight{% endif %}"
+                    href="{{ url_for('main.index') }}">
+                    <span class="material-symbols-outlined">dashboard</span>
+                    <span class="ml-3 text-sm font-medium tracking-wide">Dashboard</span>
+                </a>
+
+                <a class="flex items-center gap-4 px-3 py-3 rounded-lg transition-all
+                {% if current_page == 'main.feed' %}bg-primary/10 border-l-2 border-primary text-primary
+                {% else %}text-gray-400 hover:text-white hover:bg-surface-highlight{% endif %}"
+                    href="{{ url_for('main.feed') }}">
+                    <span class="material-symbols-outlined">satellite_alt</span>
+                    <span class="ml-3 text-sm font-medium tracking-wide">Live Feed</span>
+                </a>
+
+                <a class="flex items-center gap-4 px-3 py-3 rounded-lg transition-all
+                {% if current_page == 'main.nodes' %}bg-primary/10 border-l-2 border-primary text-primary
+                {% else %}text-gray-400 hover:text-white hover:bg-surface-highlight{% endif %}"
+                    href="{{ url_for('main.nodes') }}">
+                    <span class="material-symbols-outlined">devices</span>
+                    <span class="ml-3 text-sm font-medium tracking-wide">Local Devices</span>
+                </a>
+
+                <a class="flex items-center gap-4 px-3 py-3 rounded-lg transition-all
+                {% if current_page == 'main.logs' %}bg-danger/10 border-l-2 border-danger text-danger
+                {% else %}text-gray-400 hover:text-danger hover:bg-danger/10{% endif %}"
+                    href="{{ url_for('main.logs') }}">
+                    <span class="material-symbols-outlined">warning</span>
+                    <span class="ml-3 text-sm font-medium tracking-wide">Threat Logs</span>
+                </a>
+
+                <div class="mt-4 mb-2 px-3">
+                    <p class="text-xs text-gray-600 font-bold tracking-wider uppercase">System</p>
+                </div>
+
+                <a class="flex items-center gap-4 px-3 py-3 rounded-lg transition-all
+                {% if current_page == 'main.settings' %}bg-primary/10 border-l-2 border-primary text-primary
+                {% else %}text-gray-400 hover:text-white hover:bg-surface-highlight{% endif %}"
+                    href="{{ url_for('main.settings') }}">
+                    <span class="material-symbols-outlined">settings</span>
+                    <span class="ml-3 text-sm font-medium tracking-wide">Settings</span>
+                </a>
+            </nav>
+
+            <!-- Section 3 (Bottom - Fixed) -->
+            <div class="shrink-0 p-4 bg-surface border-t border-[#333] space-y-4">
+                <!-- Status & Controls -->
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-500 uppercase tracking-wider">Status</span>
+                        <span id="system-status-text" class="text-danger font-bold">Paused</span>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button id="global-pause-btn"
+                            class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-black font-bold rounded-lg hover:bg-white transition-colors"
+                            title="Start Monitoring">
+                            <span class="material-symbols-outlined">play_arrow</span>
+                        </button>
+                        <button id="session-restart-btn"
+                            class="px-3 py-2 bg-surface-highlight text-gray-400 rounded-lg hover:bg-danger hover:text-white transition-colors"
+                            title="Restart Session">
+                            <span class="material-symbols-outlined">refresh</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- System Resources -->
+                <div class="space-y-3 pt-3 border-t border-[#333]">
+                    <span class="text-xs text-gray-500 uppercase tracking-wider block mb-2">System Resources</span>
+
+                    <!-- CPU -->
+                    <div class="pb-2 mb-2 border-b border-[#333]">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-gray-400">CPU</span>
+                            <div class="h-2 w-24 bg-[#222] rounded-full overflow-hidden">
+                                <div id="cpu-bar" class="h-full bg-primary rounded-full transition-all duration-300"
+                                    style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>App:</span>
+                            <span id="cpuApp" class="text-primary font-mono">0%</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>Sys:</span>
+                            <span id="cpuSys" class="text-gray-400 font-mono">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- RAM -->
+                    <div class="pb-2 mb-2 border-b border-[#333]">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-gray-400">RAM</span>
+                            <div class="h-2 w-24 bg-[#222] rounded-full overflow-hidden">
+                                <div id="ram-bar" class="h-full bg-blue-500 rounded-full transition-all duration-300"
+                                    style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>App:</span>
+                            <span id="ramApp" class="text-blue-400 font-mono">0 MB</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>Sys:</span>
+                            <span id="ramSys" class="text-gray-400 font-mono">0 / 0 GB</span>
+                        </div>
+                    </div>
+
+                    <!-- Disk -->
+                    <div class="pb-2">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-gray-400">Storage</span>
+                            <div class="h-2 w-24 bg-[#222] rounded-full overflow-hidden">
+                                <div id="disk-bar" class="h-full bg-purple-500 rounded-full transition-all duration-300"
+                                    style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>DB:</span>
+                            <span id="diskApp" class="text-purple-400 font-mono">0 KB</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>Sys:</span>
+                            <span id="diskSys" class="text-gray-400 font-mono">0 / 0 GB</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main
+            class="flex-1 flex flex-col min-w-0 bg-background overflow-x-hidden w-full relative transition-all md:ml-64">
+            <!-- Mobile Header -->
+            <div
+                class="md:hidden flex items-center justify-between p-4 border-b border-[#333] bg-surface sticky top-0 z-30">
+                <button id="sidebarToggleBtn" class="text-gray-300 hover:text-white transition-colors">
+                    <span class="material-symbols-outlined">menu</span>
+                </button>
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">shield_lock</span>
+                    <span class="font-bold text-white tracking-widest">SENTINELS</span>
+                </div>
+                <div class="w-6"></div>
+            </div>
+
+
+            <div class="p-6 lg:p-10 flex flex-col gap-8 max-w-[1600px] w-full mx-auto">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Base Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <!-- Global Modal -->
+    <div id="genericModal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-surface border border-[#333] rounded-xl max-w-md w-full overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-[#333]">
+                <h3 id="modalTitle" class="text-lg font-bold text-white">Modal Title</h3>
+            </div>
+
+            <!-- Modal Body -->
+            <div id="modalBody" class="p-4 text-gray-300">
+                Modal content goes here
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="flex justify-end gap-3 p-4 border-t border-[#333]">
+                <button id="modalCancelBtn"
+                    class="px-4 py-2 bg-[#333] text-gray-300 rounded-lg hover:bg-[#444] transition-colors">
+                    Cancel
+                </button>
+                <button id="modalConfirmBtn"
+                    class="px-4 py-2 bg-primary text-black font-bold rounded-lg hover:bg-white transition-colors">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Controls (works on all pages) -->
+    <script>
+            (function () {
+                // Shared socket for global controls
+                const globalSocket = io();
+                let monitoringActive = false;
+                let modalConfirmAction = null;
+
+                // Elements
+                const sidebar = document.getElementById('sidebar');
+                const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+                const mainContent = document.querySelector('main');
+
+                const pauseBtn = document.getElementById('global-pause-btn');
+                const restartBtn = document.getElementById('session-restart-btn');
+                const statusText = document.getElementById('system-status-text');
+
+                // System resource elements
+                const cpuApp = document.getElementById('cpuApp');
+                const cpuSys = document.getElementById('cpuSys');
+                const cpuBar = document.getElementById('cpu-bar');
+
+                const ramApp = document.getElementById('ramApp');
+                const ramSys = document.getElementById('ramSys');
+                const ramBar = document.getElementById('ram-bar');
+
+                const diskApp = document.getElementById('diskApp'); // DB Size
+                const diskSys = document.getElementById('diskSys');
+                const diskBar = document.getElementById('disk-bar');
+
+                // Modal elements
+                const modal = document.getElementById('genericModal');
+                const modalTitle = document.getElementById('modalTitle');
+                const modalBody = document.getElementById('modalBody');
+                const modalCancelBtn = document.getElementById('modalCancelBtn');
+                const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+
+                // ===== Modal System =====
+                function showModal(title, htmlContent, onConfirmAction) {
+                    modalTitle.textContent = title;
+                    modalBody.innerHTML = htmlContent;
+                    modalConfirmAction = onConfirmAction;
+
+                    // Show/hide confirm button based on action
+                    if (onConfirmAction) {
+                        modalConfirmBtn.classList.remove('hidden');
+                        modalCancelBtn.textContent = 'Cancel';
+                    } else {
+                        modalConfirmBtn.classList.add('hidden');
+                        modalCancelBtn.textContent = 'Close';
+                    }
+
+                    modal.classList.remove('hidden');
+                }
+
+                function hideModal() {
+                    modal.classList.add('hidden');
+                    modalConfirmAction = null;
+                }
+
+                if (modalCancelBtn) {
+                    modalCancelBtn.addEventListener('click', hideModal);
+                }
+
+                if (modalConfirmBtn) {
+                    modalConfirmBtn.addEventListener('click', () => {
+                        if (modalConfirmAction) {
+                            modalConfirmAction();
+                        }
+                        hideModal();
+                    });
+                }
+
+                // Close on background click
+                if (modal) {
+                    modal.addEventListener('click', (e) => {
+                        if (e.target === modal) hideModal();
+                    });
+                }
+
+                // Close on Escape
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') hideModal();
+                });
+
+                // ===== UI Functions =====
+                function updateUI(isActive) {
+                    monitoringActive = isActive;
+                    if (pauseBtn) {
+                        pauseBtn.innerHTML = isActive
+                            ? '<span class="material-symbols-outlined">pause</span>'
+                            : '<span class="material-symbols-outlined">play_arrow</span>';
+                        pauseBtn.title = isActive ? 'Pause Monitoring' : 'Start Monitoring';
+                    }
+                    if (statusText) {
+                        statusText.textContent = isActive ? 'Monitoring' : 'Paused';
+                        statusText.className = isActive ? 'text-primary font-bold' : 'text-danger font-bold';
+                    }
+                }
+
+                function updateSidebarStats(data) {
+                    // CPU
+                    if (cpuApp) cpuApp.textContent = data.cpu_script + '%';
+                    if (cpuSys) cpuSys.textContent = data.cpu_system + '%';
+                    if (cpuBar) cpuBar.style.width = Math.min(data.cpu_system, 100) + '%';
+
+                    // RAM
+                    if (ramApp) ramApp.textContent = data.ram_script_used;
+                    if (ramSys) ramSys.textContent = `${data.ram_system_used} / ${data.ram_system_total}`;
+                    if (ramBar) ramBar.style.width = data.ram_system_percent + '%';
+
+                    // Disk (DB and System)
+                    if (diskApp) diskApp.textContent = data.db_size;
+                    if (diskSys) diskSys.textContent = `${data.disk_system_used} / ${data.disk_system_total}`;
+                    if (diskBar) diskBar.style.width = data.disk_system_percent + '%';
+                }
+
+                function showToast(message, type = 'success') {
+                    const toast = document.createElement('div');
+                    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-primary text-black' : 'bg-danger text-white'
+                        } font-bold`;
+                    toast.textContent = message;
+                    document.body.appendChild(toast);
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        toast.style.transition = 'opacity 0.3s';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 3000);
+                }
+
+                // Load cached stats on init
+                try {
+                    const cachedStats = localStorage.getItem('sysStats');
+                    if (cachedStats) {
+                        updateSidebarStats(JSON.parse(cachedStats));
+                    }
+                } catch (e) {
+                    console.error('Error loading cached stats:', e);
+                }
+
+                // ===== Socket Event Listeners =====
+                globalSocket.on('init_stats', (data) => {
+                    updateUI(data.monitoring_active);
+                });
+
+                globalSocket.on('monitoring_status', (data) => {
+                    updateUI(data.active);
+                });
+
+                globalSocket.on('session_restarted', () => {
+                    updateUI(false);
+                    showToast('Session Reset Successfully');
+                });
+
+                // System usage updates
+                globalSocket.on('system_usage', (data) => {
+                    updateSidebarStats(data);
+                    // Persist to local storage
+                    localStorage.setItem('sysStats', JSON.stringify(data));
+                });
+
+                // ===== Button Handlers =====
+                if (sidebarToggleBtn && sidebar) {
+                    sidebarToggleBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        sidebar.classList.toggle('-translate-x-full');
+                    });
+                }
+
+                // Close sidebar when clicking main content on mobile
+                if (mainContent && sidebar) {
+                    mainContent.addEventListener('click', () => {
+                        if (window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) {
+                            sidebar.classList.add('-translate-x-full');
+                        }
+                    });
+                }
+
+                if (pauseBtn) {
+                    pauseBtn.addEventListener('click', () => {
+                        globalSocket.emit('toggle_monitoring', { target_state: !monitoringActive });
+                    });
+                }
+
+                if (restartBtn) {
+                    restartBtn.addEventListener('click', () => {
+                        showModal(
+                            'Restart Session?',
+                            '<p class="text-gray-400">This will clear all logs and reset statistics. Are you sure?</p>' +
+                            '<p class="text-danger text-sm mt-2">⚠️ This action cannot be undone.</p>',
+                            () => {
+                                globalSocket.emit('restart_session');
+                            }
+                        );
+                    });
+                }
+
+                // Expose for other scripts
+                window.SentinelsGlobal = {
+                    socket: globalSocket,
+                    isMonitoringActive: () => monitoringActive,
+                    showModal: showModal,
+                    hideModal: hideModal,
+                    showToast: showToast
+                };
+            })();
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

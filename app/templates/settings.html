@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Sentinels{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-center justify-between">
+    <div>
+        <h2 class="text-3xl font-bold text-white tracking-tight uppercase">Settings</h2>
+        <p class="text-gray-400 mt-1">Configuration and data management</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Data Export Card -->
+    <div class="bg-surface border border-[#333] rounded-xl p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="size-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <span class="material-symbols-outlined text-blue-400">download</span>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-white">Data Export</h3>
+                <p class="text-gray-500 text-sm">Download threat logs for analysis</p>
+            </div>
+        </div>
+
+        <p class="text-gray-400 text-sm mb-4">
+            Export all recorded threat events to a CSV file.
+            The report includes timestamps, source/destination IPs, protocols,
+            threat types, severity levels, and packet sizes.
+        </p>
+
+        <button id="exportBtn"
+            class="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-400 transition-colors">
+            <span class="material-symbols-outlined text-sm">description</span>
+            Download Threat Report (CSV)
+        </button>
+    </div>
+
+    <!-- Danger Zone Card -->
+    <div class="bg-surface border border-danger/30 rounded-xl p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="size-10 rounded-lg bg-danger/20 flex items-center justify-center">
+                <span class="material-symbols-outlined text-danger">warning</span>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-danger">Danger Zone</h3>
+                <p class="text-gray-500 text-sm">Irreversible data operations</p>
+            </div>
+        </div>
+
+        <p class="text-gray-400 text-sm mb-4">
+            Permanently delete all threat records from the database.
+            This action cannot be undone. Make sure to export your data first
+            if you need to keep a backup.
+        </p>
+
+        <button id="clearDatabaseBtn"
+            class="flex items-center gap-2 px-4 py-2 bg-danger/20 text-danger font-bold rounded-lg hover:bg-danger hover:text-white transition-colors border border-danger/50">
+            <span class="material-symbols-outlined text-sm">delete_forever</span>
+            Clear Threat Database
+        </button>
+    </div>
+</div>
+
+<!-- About Card -->
+<div class="bg-surface border border-[#333] rounded-xl p-6">
+    <div class="flex items-start gap-6">
+        <div class="size-16 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-primary text-3xl">shield_lock</span>
+        </div>
+        <div class="flex-1">
+            <h3 class="text-2xl font-bold text-white mb-1">SENTINELS</h3>
+            <p class="text-primary font-mono text-sm mb-3">Version 1.0.0 (Master's Build)</p>
+            <p class="text-gray-400 text-sm">
+                Network Traffic Analysis & Intrusion Detection System.
+                Real-time packet capture, threat detection, device fingerprinting,
+                and comprehensive network monitoring for security professionals.
+            </p>
+
+            <div class="mt-4 pt-4 border-t border-[#333] grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                    <p class="text-gray-500">Framework</p>
+                    <p class="text-white font-medium">Flask + SocketIO</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Packet Engine</p>
+                    <p class="text-white font-medium">Scapy</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Database</p>
+                    <p class="text-white font-medium">SQLite</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Platform</p>
+                    <p class="text-white font-medium">Windows (Npcap)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Developer Credits -->
+<div class="text-center text-gray-600 text-sm">
+    <p>Built with 💚 for network security research</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Local Devices - Sentinels{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-white tracking-tight uppercase">Local Devices (LAN)</h2>
+        <p class="text-gray-400 mt-1">
+            <span class="text-primary font-bold">{{ nodes|length }}</span> Devices Discovered on Local Network
+        </p>
+    </div>
+    <div class="flex items-center gap-2 text-xs text-gray-500">
+        <span class="material-symbols-outlined text-sm">info</span>
+        Private IPs only (192.168.x.x, 10.x.x, 172.16.x.x)
+    </div>
+</div>
+
+{% if nodes %}
+<!-- Nodes Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for node in nodes %}
+    <div class="bg-surface border border-[#333] rounded-lg p-5 hover:border-primary/50 transition-all group">
+        <!-- Device Name & IP -->
+        <div class="flex items-center gap-3 mb-3">
+            <div class="size-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <span class="material-symbols-outlined text-primary text-2xl">
+                    {% if node.hostname %}devices{% else %}computer{% endif %}
+                </span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <!-- Device Name (hostname takes priority) -->
+                <p class="text-white font-bold text-lg group-hover:text-primary transition-colors truncate">
+                    {% if node.hostname %}
+                    {{ node.hostname }}
+                    {% elif node.vendor and node.vendor != 'Unknown' and node.vendor != 'Resolving...' %}
+                    {{ node.vendor }}
+                    {% else %}
+                    <span class="text-gray-400">{{ node.ip }}</span>
+                    {% endif %}
+                </p>
+                <!-- IP Address (primary - usually IPv4) -->
+                <p class="text-primary font-mono text-sm">{{ node.ip }}</p>
+                <!-- Secondary IP (usually IPv6) - shown smaller -->
+                {% if node.secondary_ip %}
+                <p class="text-gray-500 font-mono text-xs truncate" title="{{ node.secondary_ip }}">{{
+                    node.secondary_ip[:20] }}...</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Vendor Badge (if hostname exists) -->
+        {% if node.hostname and node.vendor and node.vendor != 'Unknown' and node.vendor != 'Resolving...' %}
+        <div class="mb-3 px-3 py-2 bg-background rounded-lg">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Manufacturer</p>
+            <p class="text-white text-sm font-medium truncate">{{ node.vendor }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="bg-background rounded-lg p-3">
+                <p class="text-gray-500 text-xs uppercase tracking-wider">Packets</p>
+                <p class="text-white text-xl font-bold">{{ node.packets }}</p>
+            </div>
+            <div class="bg-background rounded-lg p-3">
+                <p class="text-gray-500 text-xs uppercase tracking-wider">Data</p>
+                <p class="text-white text-xl font-bold">
+                    {% if node.bytes >= 1048576 %}
+                    {{ "%.1f"|format(node.bytes / 1048576) }} MB
+                    {% elif node.bytes >= 1024 %}
+                    {{ "%.1f"|format(node.bytes / 1024) }} KB
+                    {% else %}
+                    {{ node.bytes }} B
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer: MAC & Last Seen -->
+        <div class="pt-3 border-t border-[#333] space-y-2">
+            {% if node.mac %}
+            <div class="flex items-center justify-between">
+                <span class="text-gray-500 text-xs">MAC Address</span>
+                <span class="text-gray-400 font-mono text-xs">{{ node.mac }}</span>
+            </div>
+            {% endif %}
+            <div class="flex items-center justify-between">
+                <span class="text-gray-500 text-xs">Last Active</span>
+                <span class="text-primary font-mono text-sm">{{ node.last_seen[11:19] }}</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<!-- Empty State -->
+<div class="bg-surface border border-[#333] rounded-lg p-16 text-center">
+    <span class="material-symbols-outlined text-6xl text-primary mb-4 block animate-pulse">router</span>
+    <h3 class="text-xl font-bold text-white mb-2">Scanning Local Network...</h3>
+    <p class="text-gray-500">Local devices will appear here once traffic is detected.</p>
+    <p class="text-gray-600 text-sm mt-2">Start monitoring to discover devices on your LAN.</p>
+</div>
+{% endif %}
+
+<!-- Back Link -->
+<a href="{{ url_for('main.index') }}"
+    class="flex items-center gap-2 text-primary hover:text-white transition-colors text-sm font-medium w-fit">
+    <span class="material-symbols-outlined text-sm">arrow_back</span>
+    Back to Dashboard
+</a>
+{% endblock %}

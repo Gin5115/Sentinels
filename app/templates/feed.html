@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Live Feed - Sentinels{% endblock %}
+
+{% block content %}
+<!-- Header with Controls -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-white tracking-tight uppercase">Live Packet Feed</h2>
+        <p class="text-gray-400 mt-1">Real-time network traffic stream</p>
+    </div>
+
+    <!-- Control Bar -->
+    <div class="flex flex-wrap items-center gap-3">
+        <!-- Protocol Filter -->
+        <select id="protocolFilter"
+            class="px-4 py-2 bg-surface border border-[#333] rounded-lg text-white text-sm focus:border-primary focus:outline-none">
+            <option value="all">All Protocols</option>
+            <option value="TCP">TCP</option>
+            <option value="UDP">UDP</option>
+            <option value="ICMP">ICMP</option>
+        </select>
+
+        <!-- IP Search -->
+        <input type="text" id="ipSearch" placeholder="Filter by IP..."
+            class="px-4 py-2 bg-surface border border-[#333] rounded-lg text-white text-sm placeholder-gray-500 focus:border-primary focus:outline-none w-40">
+
+        <!-- Buttons -->
+        <button id="localPauseBtn"
+            class="flex items-center gap-2 px-4 py-2 bg-[#333] text-gray-300 rounded-lg hover:bg-surface-highlight transition-colors">
+            <span class="material-symbols-outlined text-sm">pause</span>
+            <span class="hidden sm:inline">Pause</span>
+        </button>
+
+        <button id="clearTableBtn"
+            class="flex items-center gap-2 px-4 py-2 bg-danger/20 text-danger rounded-lg hover:bg-danger hover:text-white transition-colors">
+            <span class="material-symbols-outlined text-sm">delete</span>
+            <span class="hidden sm:inline">Clear</span>
+        </button>
+    </div>
+</div>
+
+<!-- Stats Bar -->
+<div class="flex items-center gap-4 text-sm">
+    <div class="px-3 py-1 bg-surface border border-[#333] rounded">
+        <span class="text-gray-500">Packets:</span>
+        <span id="feedPacketCount" class="text-primary font-bold ml-1">0</span>
+    </div>
+    <div class="px-3 py-1 bg-surface border border-[#333] rounded">
+        <span class="text-gray-500">Rate:</span>
+        <span id="feedPacketRate" class="text-white font-mono ml-1">0/s</span>
+    </div>
+    <div id="feedStatusIndicator" class="flex items-center gap-2">
+        <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+        </span>
+        <span class="text-primary text-xs font-bold">LIVE</span>
+    </div>
+</div>
+
+<!-- Virtual Scroll Packet List -->
+<div class="bg-surface border border-[#333] rounded-lg overflow-hidden flex flex-col"
+    style="height: calc(100vh - 280px); min-height: 400px;">
+    <!-- Header -->
+    <div
+        class="flex items-center bg-surface-highlight text-xs uppercase tracking-wider text-gray-400 border-b border-[#333] shrink-0">
+        <div class="w-16 px-4 py-3 font-medium">No.</div>
+        <div class="w-24 px-4 py-3 font-medium">Time</div>
+        <div class="flex-1 px-4 py-3 font-medium">Source</div>
+        <div class="flex-1 px-4 py-3 font-medium">Destination</div>
+        <div class="w-20 px-4 py-3 font-medium">Protocol</div>
+        <div class="w-20 px-4 py-3 font-medium">Length</div>
+        <div class="flex-1 px-4 py-3 font-medium">Status/Info</div>
+        <div class="w-16 px-4 py-3 font-medium text-center">Actions</div>
+    </div>
+
+    <!-- Virtual Scroll Container (ONLY scrollable element) -->
+    <div id="virtualScrollContainer" class="flex-1 overflow-y-auto overflow-x-hidden relative">
+        <div id="virtualContent" class="relative">
+            <div id="virtualViewport" class="relative"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Packet Details Modal -->
+<div id="packetDetailsModal"
+    class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-surface border border-[#333] rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between p-4 border-b border-[#333]">
+            <h3 class="text-lg font-bold text-white">Packet Details</h3>
+            <button id="closeModalBtn" class="text-gray-400 hover:text-white transition-colors">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="p-4 overflow-y-auto flex-1 space-y-4">
+            <!-- Packet Info Grid -->
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                <div class="bg-background rounded-lg p-3">
+                    <p class="text-gray-500 text-xs uppercase">Source</p>
+                    <p id="modalSrcIp" class="text-primary font-mono">—</p>
+                </div>
+                <div class="bg-background rounded-lg p-3">
+                    <p class="text-gray-500 text-xs uppercase">Destination</p>
+                    <p id="modalDstIp" class="text-white font-mono">—</p>
+                </div>
+                <div class="bg-background rounded-lg p-3">
+                    <p class="text-gray-500 text-xs uppercase">Protocol</p>
+                    <p id="modalProtocol" class="text-white font-bold">—</p>
+                </div>
+                <div class="bg-background rounded-lg p-3">
+                    <p class="text-gray-500 text-xs uppercase">Length</p>
+                    <p id="modalLength" class="text-white font-mono">—</p>
+                </div>
+                <div class="bg-background rounded-lg p-3">
+                    <p class="text-gray-500 text-xs uppercase">Timestamp</p>
+                    <p id="modalTimestamp" class="text-white font-mono text-xs">—</p>
+                </div>
+                <div class="bg-background rounded-lg p-3">
+                    <p class="text-gray-500 text-xs uppercase">Ports</p>
+                    <p id="modalPorts" class="text-white font-mono">—</p>
+                </div>
+            </div>
+
+            <!-- Payload -->
+            <div>
+                <p class="text-gray-500 text-xs uppercase mb-2">Payload Data</p>
+                <pre id="modalPayload"
+                    class="bg-background rounded-lg p-4 text-xs text-gray-300 font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-48">No payload data</pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/feed.js') }}"></script>
+{% endblock %}

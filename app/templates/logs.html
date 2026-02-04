@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Threat Logs - Sentinels{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-white tracking-tight uppercase">Threat Logs</h2>
+        <p class="text-gray-400 mt-1">Historical record of detected network threats</p>
+    </div>
+    <button id="clearHistoryBtn"
+        class="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger/80 text-white font-bold rounded-lg transition-colors">
+        <span class="material-symbols-outlined text-sm">delete_forever</span>
+        Clear History
+    </button>
+</div>
+
+<!-- Stats -->
+<div class="flex items-center gap-4">
+    <div class="px-4 py-2 bg-surface border border-[#333] rounded-lg">
+        <span class="text-gray-400 text-sm">Total Threats:</span>
+        <span class="text-danger font-bold ml-2" id="totalCount">{{ threats|length }}</span>
+    </div>
+</div>
+
+<div class="bg-surface border border-[#333] rounded-lg overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-surface-highlight text-xs uppercase tracking-wider text-gray-400">
+                    <th class="px-6 py-4 font-medium" style="min-width: 60px;">ID</th>
+                    <th class="px-6 py-4 font-medium" style="min-width: 160px;">Timestamp</th>
+                    <th class="px-6 py-4 font-medium" style="min-width: 130px;">Source IP</th>
+                    <th class="px-6 py-4 font-medium" style="min-width: 130px;">Target IP</th>
+                    <th class="px-6 py-4 font-medium" style="min-width: 80px;">Protocol</th>
+                    <th class="px-6 py-4 font-medium" style="min-width: 180px;">Threat Type</th>
+                    <th class="px-6 py-4 font-medium" style="min-width: 90px;">Severity</th>
+                    <th class="px-6 py-4 font-medium text-center" style="min-width: 70px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="text-sm divide-y divide-[#333]" id="logsTableBody">
+                {% if threats %}
+                {% for threat in threats %}
+                <tr class="hover:bg-white/5 transition-colors" id="row-{{ threat.id }}">
+                    <td class="px-6 py-4 font-mono text-gray-500">#{{ threat.id }}</td>
+                    <td class="px-6 py-4 font-mono text-gray-400">{{ threat.timestamp }}</td>
+                    <td class="px-6 py-4">
+                        {% if threat.source_ip %}
+                        <span
+                            class="font-mono text-primary cursor-pointer hover:text-white hover:underline transition-colors"
+                            onclick="window.SentinelsShowIPDetails && window.SentinelsShowIPDetails('{{ threat.source_ip }}')"
+                            title="Click for Deep Dive">
+                            {{ threat.source_ip }}
+                        </span>
+                        {% else %}
+                        <span class="text-gray-500">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 font-mono text-gray-300">{{ threat.destination_ip or '—' }}</td>
+                    <td class="px-6 py-4">
+                        <span
+                            class="inline-block whitespace-nowrap px-2 py-1 rounded text-xs font-bold bg-[#333] text-gray-300 border border-gray-600">
+                            {{ threat.protocol or 'N/A' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span
+                            class="inline-block whitespace-nowrap px-2 py-1 rounded text-xs font-bold bg-danger/20 text-danger border border-danger/40">
+                            {{ threat.threat_type or 'Unknown' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if threat.severity == 'CRITICAL' %}
+                        <span class="text-danger font-bold">{{ threat.severity }}</span>
+                        {% elif threat.severity == 'HIGH' %}
+                        <span class="text-orange-500 font-bold">{{ threat.severity }}</span>
+                        {% elif threat.severity == 'MEDIUM' %}
+                        <span class="text-yellow-500">{{ threat.severity }}</span>
+                        {% else %}
+                        <span class="text-gray-400">{{ threat.severity or 'LOW' }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-center align-middle">
+                        <button
+                            onclick="window.SentinelsShowIPDetails && window.SentinelsShowIPDetails('{{ threat.source_ip }}')"
+                            class="p-2 text-gray-400 hover:text-primary hover:bg-primary/10 rounded transition-colors inline-flex items-center justify-center"
+                            title="Inspect IP">
+                            <span class="material-symbols-outlined text-sm">search</span>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr id="emptyState">
+                    <td colspan="8" class="px-6 py-16 text-center text-gray-500">
+                        <span class="material-symbols-outlined text-5xl mb-3 block text-primary">verified_user</span>
+                        <p class="text-lg font-medium text-gray-400">No threats detected</p>
+                        <p class="text-sm">Your network is secure. Threats will appear here when detected.</p>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Back Link -->
+<a href="{{ url_for('main.index') }}"
+    class="flex items-center gap-2 text-primary hover:text-white transition-colors text-sm font-medium w-fit">
+    <span class="material-symbols-outlined text-sm">arrow_back</span>
+    Back to Dashboard
+</a>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/logs.js') }}"></script>
+<script>
+    // Standalone Deep Dive function for Threat Logs page
+    window.SentinelsShowIPDetails = function (ip) {
+        if (!ip || ip === '—') return;
+
+        // Create and show modal
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
+        modal.id = 'deep-dive-modal';
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+        modal.innerHTML = `
+        <div class="bg-surface border border-[#333] rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-white">Deep Dive: ${ip}</h3>
+                <button onclick="document.getElementById('deep-dive-modal').remove()" 
+                    class="text-gray-400 hover:text-white">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div id="modal-content" class="space-y-4">
+                <div class="flex items-center justify-center py-8">
+                    <span class="material-symbols-outlined animate-spin text-primary">autorenew</span>
+                    <span class="ml-2 text-gray-400">Loading...</span>
+                </div>
+            </div>
+        </div>
+    `;
+        document.body.appendChild(modal);
+
+        // Fetch packet data and geo data in parallel
+        Promise.all([
+            fetch('/api/packets?limit=50000').then(res => res.json()),
+            fetch(`/api/geo/${ip}`).then(res => res.json())
+        ])
+            .then(([packetData, geoData]) => {
+                const content = document.getElementById('modal-content');
+
+                if (!packetData.success || !packetData.packets) {
+                    content.innerHTML = '<p class="text-gray-400">No packet data available</p>';
+                    return;
+                }
+
+                // Process packet data
+                const ipPackets = packetData.packets.filter(p => p.src_ip === ip || p.dst_ip === ip);
+                const protocols = {};
+                ipPackets.forEach(p => {
+                    const proto = (p.protocol || 'OTHER').toUpperCase();
+                    protocols[proto] = (protocols[proto] || 0) + 1;
+                });
+
+                const total = Object.values(protocols).reduce((a, b) => a + b, 0) || 1;
+                const bars = Object.entries(protocols)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([proto, count]) => {
+                        const pct = ((count / total) * 100).toFixed(1);
+                        const color = proto === 'TCP' ? '#0df269' : proto === 'UDP' ? '#3b82f6' : '#888';
+                        return `
+                        <div class="flex items-center gap-2">
+                            <span class="w-12 text-xs text-gray-400">${proto}</span>
+                            <div class="flex-1 bg-[#222] rounded h-2 overflow-hidden">
+                                <div class="h-full rounded" style="width: ${pct}%; background: ${color}"></div>
+                            </div>
+                            <span class="w-12 text-xs text-gray-300 text-right">${pct}%</span>
+                        </div>
+                    `;
+                    }).join('');
+
+                // Process Geo Data
+                let flag = '🌐';
+                let location = 'Unknown, Unknown';
+
+                if (geoData.success && geoData.geo) {
+                    flag = geoData.geo.flag || '🌐';
+                    // If private IP (local network)
+                    if (geoData.geo.country === 'LAN') {
+                        flag = '💻';
+                        location = 'Local Network';
+                    } else if (geoData.geo.country !== 'Unknown') {
+                        location = `${geoData.geo.city}, ${geoData.geo.country}`;
+                    }
+                }
+
+                content.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-[#111] p-3 rounded border border-[#333]">
+                        <span class="text-xs text-gray-500 uppercase block mb-1">IP Address</span>
+                        <div class="text-primary font-mono text-sm">${ip}</div>
+                    </div>
+                    <div class="bg-[#111] p-3 rounded border border-[#333]">
+                        <span class="text-xs text-gray-500 uppercase block mb-1">Packets</span>
+                        <div class="text-white font-bold text-lg">${ipPackets.length.toLocaleString()}</div>
+                    </div>
+                </div>
+                <div class="bg-[#111] p-3 rounded border border-[#333]">
+                    <span class="text-xs text-gray-500 uppercase block mb-1">Location</span>
+                    <div class="text-white text-sm flex items-center gap-2">
+                        <span class="text-lg">${flag}</span>
+                        <span>${location}</span>
+                    </div>
+                </div>
+                <div class="bg-[#111] p-4 rounded border border-[#333]">
+                    <span class="text-xs text-gray-500 uppercase block mb-3">Protocol Breakdown</span>
+                    <div class="space-y-2">${bars || '<p class="text-gray-500 text-xs">No data</p>'}</div>
+                </div>
+            `;
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('modal-content').innerHTML =
+                    '<p class="text-danger">Error loading data</p>';
+            });
+    };
+</script>
+{% endblock %}
