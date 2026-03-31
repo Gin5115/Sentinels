@@ -140,6 +140,37 @@ Scapy handles Ethernet frame parsing, protocol dissection, and TCP flag extracti
 
 ---
 
+## Branches
+
+| Branch | Description |
+|--------|-------------|
+| `main` | Original Windows implementation — the starting point of the project |
+| `linux-implementation` | Full feature set — Linux/macOS compatible with all features added |
+
+**`linux-implementation` is the recommended branch.** The `main` branch is behind and is missing several features:
+
+| Feature | `main` (Windows) | `linux-implementation` |
+|---------|:-----------------:|:----------------------:|
+| Linux / macOS support | No | Yes |
+| ICMP Flood detection rule | No | Yes |
+| D3.js Geo-IP world map | No | Yes |
+| Nodes / Logs auto-refresh | No | Yes |
+| Interface selector in Settings | No | Yes |
+| `requests` dependency declared | No | Yes |
+
+### Switching branches
+
+```bash
+# Clone and switch to the full-featured branch
+git clone https://github.com/Gin5115/Sentinels
+cd Sentinels
+git checkout linux-implementation
+```
+
+> Windows users can stay on `main` and follow the original Windows setup, but the geo map, ICMP flood rule, and several UI features will not be present.
+
+---
+
 ## Installation
 
 ### Prerequisites
