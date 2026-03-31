@@ -1,9 +1,11 @@
 """
 Packet capture module using Scapy.
-Requires Npcap to be installed on Windows.
+Requires libpcap on Linux/macOS or Npcap on Windows.
 Supports both IPv4 and IPv6 traffic.
 """
+import sys
 import threading
+import psutil
 from datetime import datetime
 
 from scapy.all import sniff, IP, IPv6, TCP, UDP, Ether, Raw, conf
@@ -27,6 +29,19 @@ def detect_threats(packet_data):
         if flags == 'S' and length < 60:
              return {'type': 'Potential SYN Scan'}
     return None
+
+
+def _get_if_list():
+    """Cross-platform replacement for get_windows_if_list().
+    Returns list of dicts with keys: name, description, ips."""
+    result = []
+    for name, addr_list in psutil.net_if_addrs().items():
+        ips = [
+            a.address for a in addr_list
+            if a.family.name in ('AF_INET', 'AF_INET6')
+        ]
+        result.append({'name': name, 'description': name, 'ips': ips})
+    return result
 
 
 class PacketSniffer:
@@ -249,7 +264,7 @@ class PacketSniffer:
             print('[Sniffer] Sniff loop ended normally')
         except PermissionError as e:
             print(f'[Sniffer] ✗ PERMISSION ERROR: {e}')
-            print('[Sniffer] → Run the application as Administrator!')
+            print('[Sniffer] → Run with sudo (Linux/macOS) or as Administrator (Windows)!')
             error_data = {
                 'timestamp': datetime.now().isoformat(),
                 'error': 'Permission denied - Run as Administrator',
@@ -306,7 +321,7 @@ class PacketSniffer:
         Prioritizes Wi-Fi over Ethernet on laptops.
         """
         try:
-            interfaces = get_windows_if_list()
+            interfaces = _get_if_list()
             
             # Skip these virtual/inactive interfaces
             skip_keywords = ['virtual', 'loopback', 'bluetooth', 'vmware', 'virtualbox', 'hyper-v', 'pseudo']
@@ -398,7 +413,7 @@ class PacketSniffer:
             List of dictionaries containing interface information.
         """
         try:
-            interfaces = get_windows_if_list()
+            interfaces = _get_if_list()
             return [
                 {
                     'name': iface.get('name', 'Unknown'),

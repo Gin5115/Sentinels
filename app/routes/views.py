@@ -3,6 +3,7 @@ Flask routes for the Sentinels Network Traffic Analyzer.
 """
 import csv
 import io
+import sys
 from flask import render_template, jsonify, request, Response
 from app.routes import main_bp
 from app.models.threat import get_all_threats, delete_threat, clear_threat_history
@@ -39,7 +40,15 @@ def feed():
 @main_bp.route('/settings')
 def settings():
     """Settings and data management page."""
-    return render_template('settings.html')
+    if sys.platform == 'win32':
+        platform_name = 'Windows (Npcap)'
+    elif sys.platform == 'linux':
+        platform_name = 'Linux (libpcap)'
+    elif sys.platform == 'darwin':
+        platform_name = 'macOS (libpcap)'
+    else:
+        platform_name = sys.platform
+    return render_template('settings.html', platform=platform_name)
 
 
 # ============ API Routes ============
