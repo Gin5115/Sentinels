@@ -306,14 +306,14 @@ function updateCountryTable() {
     }
 
     tbody.innerHTML = rows.map(r => `
-        <tr class="border-b border-[#2a2a2a] hover:bg-white/5 transition-colors cursor-pointer"
-            onclick="showCountryPopup(${JSON.stringify(r.country)})">
-            <td class="px-3 py-2.5 text-white">
+        <tr class="border-b border-[#2a2a2a] hover:bg-white/5 transition-colors cursor-pointer geo-country-row"
+            data-country="${esc(r.country)}">
+            <td class="px-3 py-2.5 text-white pointer-events-none">
                 <span class="mr-1">${r.flag}</span><span class="text-sm">${esc(r.country)}</span>
             </td>
-            <td class="px-3 py-2.5 text-right font-mono text-gray-400 text-xs">${r.ips}</td>
-            <td class="px-3 py-2.5 text-right font-mono text-primary text-xs font-bold">${r.packets.toLocaleString()}</td>
-            <td class="px-3 py-2.5 text-center text-xs">
+            <td class="px-3 py-2.5 text-right font-mono text-gray-400 text-xs pointer-events-none">${r.ips}</td>
+            <td class="px-3 py-2.5 text-right font-mono text-primary text-xs font-bold pointer-events-none">${r.packets.toLocaleString()}</td>
+            <td class="px-3 py-2.5 text-center text-xs pointer-events-none">
                 ${r.threat ? '<span class="text-danger font-bold">⚠</span>' : '<span class="text-primary">✓</span>'}
             </td>
         </tr>
@@ -337,13 +337,13 @@ function updateIPList() {
     tbody.innerHTML = sorted.map(c => {
         const geo = c.geo || {};
         return `
-            <tr class="border-b border-[#2a2a2a] hover:bg-white/5 transition-colors cursor-pointer"
-                onclick="showIPPopup(${JSON.stringify(c)})">
-                <td class="px-4 py-2.5 font-mono text-primary text-sm">${esc(c.ip)}</td>
-                <td class="px-4 py-2.5 text-gray-300 text-sm">${geo.flag || ''} ${esc(geo.country || 'Unknown')}</td>
-                <td class="px-4 py-2.5 text-gray-500 text-sm">${esc(geo.city || '—')}</td>
-                <td class="px-4 py-2.5 text-right font-mono text-white text-sm font-bold">${c.count.toLocaleString()}</td>
-                <td class="px-4 py-2.5 text-center text-xs">
+            <tr class="border-b border-[#2a2a2a] hover:bg-white/5 transition-colors cursor-pointer geo-ip-row"
+                data-ip="${esc(c.ip)}">
+                <td class="px-4 py-2.5 font-mono text-primary text-sm pointer-events-none">${esc(c.ip)}</td>
+                <td class="px-4 py-2.5 text-gray-300 text-sm pointer-events-none">${geo.flag || ''} ${esc(geo.country || 'Unknown')}</td>
+                <td class="px-4 py-2.5 text-gray-500 text-sm pointer-events-none">${esc(geo.city || '—')}</td>
+                <td class="px-4 py-2.5 text-right font-mono text-white text-sm font-bold pointer-events-none">${c.count.toLocaleString()}</td>
+                <td class="px-4 py-2.5 text-center text-xs pointer-events-none">
                     ${c.is_threat
                         ? '<span class="px-2 py-0.5 rounded bg-danger/20 text-danger border border-danger/30 font-bold">THREAT</span>'
                         : '<span class="px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">CLEAN</span>'}
@@ -396,6 +396,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     setInterval(() => { if (socket.connected) socket.emit('get_all_connections'); }, 5000);
+
+    // Event delegation — country table
+    document.getElementById('countryTableBody').addEventListener('click', e => {
+        const row = e.target.closest('.geo-country-row');
+        if (row) showCountryPopup(row.dataset.country);
+    });
+
+    // Event delegation — active connections table
+    document.getElementById('ipListTableBody').addEventListener('click', e => {
+        const row = e.target.closest('.geo-ip-row');
+        if (row) {
+            const conn = connections.find(c => c.ip === row.dataset.ip);
+            if (conn) showIPPopup(conn);
+        }
+    });
 
     // Redraw on resize
     let resizeTimer;
