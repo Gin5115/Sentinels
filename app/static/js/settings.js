@@ -7,6 +7,65 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('exportBtn');
     const clearDatabaseBtn = document.getElementById('clearDatabaseBtn');
 
+    // ===== Interface Selector =====
+    const socket = io();
+    const interfaceSelect = document.getElementById('interfaceSelect');
+    const applyInterfaceBtn = document.getElementById('applyInterfaceBtn');
+    const interfaceStatus = document.getElementById('interfaceStatus');
+
+    socket.emit('get_interfaces');
+
+    socket.on('interfaces_list', (data) => {
+        if (!interfaceSelect) return;
+        interfaceSelect.innerHTML = '';
+        const interfaces = data.interfaces || [];
+        if (interfaces.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No interfaces found';
+            interfaceSelect.appendChild(opt);
+        } else {
+            interfaces.forEach((iface) => {
+                const opt = document.createElement('option');
+                opt.value = iface.name;
+                const ips = (iface.ips || []).join(', ');
+                opt.textContent = ips ? `${iface.name} (${ips})` : iface.name;
+                interfaceSelect.appendChild(opt);
+            });
+        }
+    });
+
+    socket.on('capture_status', (data) => {
+        if (!interfaceStatus) return;
+        if (data.status === 'started') {
+            interfaceStatus.textContent = `Now monitoring: ${data.interface}`;
+        } else if (data.status === 'stopped') {
+            interfaceStatus.textContent = 'Monitoring stopped';
+        } else if (data.status === 'failed') {
+            interfaceStatus.textContent = 'Failed to start on selected interface';
+        }
+    });
+
+    socket.on('monitoring_status', (data) => {
+        if (!interfaceStatus) return;
+        if (data.active) {
+            interfaceStatus.textContent = interfaceStatus.textContent || 'Monitoring active';
+        } else {
+            interfaceStatus.textContent = 'Monitoring stopped';
+        }
+    });
+
+    if (applyInterfaceBtn) {
+        applyInterfaceBtn.addEventListener('click', () => {
+            const selectedValue = interfaceSelect ? interfaceSelect.value : '';
+            if (!selectedValue) return;
+            socket.emit('stop_capture');
+            setTimeout(() => {
+                socket.emit('start_capture', { interface: selectedValue });
+            }, 500);
+        });
+    }
+
     // ===== Export Threat Report =====
     if (exportBtn) {
         exportBtn.addEventListener('click', () => {

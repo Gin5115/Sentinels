@@ -174,16 +174,16 @@ class IPResolver:
         else:
             # Public IP - query ip-api.com
             try:
-                url = f'http://ip-api.com/json/{ip}?fields=status,country,city,countryCode'
+                url = f'http://ip-api.com/json/{ip}?fields=status,country,city,countryCode,lat,lon'
                 response = requests.get(url, timeout=self.API_TIMEOUT)
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     if data.get('status') == 'success':
                         country = data.get('country', 'Unknown')
                         city = data.get('city', 'Unknown')
                         country_code = data.get('countryCode', '')
-                        
+
                         # Map common country codes to flag emojis
                         flag_map = {
                             'US': '🇺🇸', 'IN': '🇮🇳', 'CN': '🇨🇳', 'JP': '🇯🇵',
@@ -192,8 +192,11 @@ class IPResolver:
                             'NL': '🇳🇱', 'SG': '🇸🇬', 'IE': '🇮🇪', 'SE': '🇸🇪'
                         }
                         flag = flag_map.get(country_code, '🌐')
-                        
-                        geo = {'country': country, 'city': city, 'flag': flag}
+
+                        geo = {
+                            'country': country, 'city': city, 'flag': flag,
+                            'lat': data.get('lat'), 'lon': data.get('lon')
+                        }
             except (requests.RequestException, ValueError):
                 pass
         

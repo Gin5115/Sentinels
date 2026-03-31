@@ -21,6 +21,7 @@ class ThreatEngine:
     # Detection thresholds (realistic values for normal networks)
     SYN_FLOOD_THRESHOLD = 100      # SYN packets per 5 seconds
     UDP_FLOOD_THRESHOLD = 500      # UDP packets per 5 seconds (raised to avoid false positives)
+    ICMP_FLOOD_THRESHOLD = 300     # ICMP packets per 5 seconds
     PORT_SCAN_THRESHOLD = 10       # Unique ports per 5 seconds
     
     # Blacklisted ports (commonly targeted by attackers)
@@ -49,6 +50,7 @@ class ThreatEngine:
         # Tracking dictionaries (reset every window)
         self._syn_track = defaultdict(int)    # {ip: count}
         self._udp_track = defaultdict(int)    # {ip: count}
+        self._icmp_track = defaultdict(int)   # {ip: count}
         self._scan_track = defaultdict(set)   # {ip: set(ports)}
         
         # Time window tracking
@@ -67,6 +69,7 @@ class ThreatEngine:
         with self._lock:
             self._syn_track.clear()
             self._udp_track.clear()
+            self._icmp_track.clear()
             self._scan_track.clear()
             self._window_start = time.time()
     
@@ -158,6 +161,23 @@ class ThreatEngine:
                         'count': udp_count
                     }
         
+        # === Rule 2b: ICMP Flood Detection ===
+        if protocol == 'ICMP' and not is_private:
+            with self._lock:
+                self._icmp_track[src_ip] += 1
+                icmp_count = self._icmp_track[src_ip]
+
+            if icmp_count > self.ICMP_FLOOD_THRESHOLD:
+                threat_key = f"icmp_flood:{src_ip}"
+                if self._should_alert(threat_key):
+                    return {
+                        'type': 'ICMP Flood',
+                        'ip': src_ip,
+                        'severity': self.SEVERITY_MEDIUM,
+                        'description': f'High volume ICMP traffic ({icmp_count}/5s) from {src_ip}',
+                        'count': icmp_count
+                    }
+
         # === Rule 3: Port Scan Detection ===
         if dst_port:
             with self._lock:
@@ -202,6 +222,7 @@ class ThreatEngine:
             return {
                 'syn_track_count': len(self._syn_track),
                 'udp_track_count': len(self._udp_track),
+                'icmp_track_count': len(self._icmp_track),
                 'scan_track_count': len(self._scan_track),
                 'recent_alerts': len(self._recent_alerts)
             }
@@ -211,6 +232,7 @@ class ThreatEngine:
         with self._lock:
             self._syn_track.clear()
             self._udp_track.clear()
+            self._icmp_track.clear()
             self._scan_track.clear()
             self._recent_alerts.clear()
             self._window_start = time.time()

@@ -27,6 +27,7 @@ TOTAL_PACKETS = 0
 THREAT_COUNT = 0
 MONITORING_ACTIVE = False
 PROTOCOL_STATS = {'TCP': 0, 'UDP': 0, 'ICMP': 0, 'Other': 0}
+THREAT_IPS = set()  # IPs that have triggered at least one threat alert
 
 # Circular buffer for packet storage (50K max - rolling window)
 PACKET_BUFFER = deque(maxlen=50000)
@@ -166,11 +167,11 @@ def emit_packet(packet_data):
     Callback function for the PacketSniffer.
     Emits packet data to all connected clients via SocketIO.
     Uses socketio.emit with namespace to work across threads.
-    
+
     Args:
         packet_data: Dictionary containing packet information
     """
-    global TOTAL_PACKETS, THREAT_COUNT, PROTOCOL_STATS
+    global TOTAL_PACKETS, THREAT_COUNT, PROTOCOL_STATS, THREAT_IPS
     TOTAL_PACKETS += 1
     
     # Track protocol distribution
@@ -216,6 +217,9 @@ def emit_packet(packet_data):
     if packet_data.get('heuristic_threat'):
         threat = packet_data['heuristic_threat']
         THREAT_COUNT += 1
+        src = packet_data.get('src_ip')
+        if src:
+            THREAT_IPS.add(src)
         socketio.emit('threat_alert', threat, namespace='/')
 
 
@@ -302,19 +306,20 @@ def handle_get_all_connections():
         all_connections = traffic_stats.get_all()
         resolver = get_resolver()
         
-        # Enrich each connection with cached geo data
+        # Enrich each connection with cached geo data and threat status
         for conn in all_connections:
             ip = conn.get('ip')
             cached_geo = resolver.get_cached_geo(ip)
-            
+
             if cached_geo:
                 conn['geo'] = cached_geo
             else:
-                # Not in cache - use default based on IP type
                 if resolver.is_private(ip):
-                    conn['geo'] = {'flag': '💻', 'country': 'LAN', 'city': 'Local Network'}
+                    conn['geo'] = {'flag': '💻', 'country': 'LAN', 'city': 'Local Network', 'lat': None, 'lon': None}
                 else:
-                    conn['geo'] = {'flag': '🌐', 'country': 'Unknown', 'city': 'Unknown'}
+                    conn['geo'] = {'flag': '🌐', 'country': 'Unknown', 'city': 'Unknown', 'lat': None, 'lon': None}
+
+            conn['is_threat'] = ip in THREAT_IPS
         
         emit('all_connections_data', all_connections)
     except Exception as e:
@@ -424,6 +429,7 @@ def handle_restart_session():
     TOTAL_PACKETS = 0
     THREAT_COUNT = 0
     PROTOCOL_STATS = {'TCP': 0, 'UDP': 0, 'ICMP': 0, 'Other': 0}
+    THREAT_IPS.clear()
     
     # Clear stored data
     clear_node_stats()

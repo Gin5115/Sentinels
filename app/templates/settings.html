@@ -63,6 +63,31 @@
     </div>
 </div>
 
+<!-- Interface Selector Card -->
+<div class="bg-surface border border-[#333] rounded-xl p-6">
+    <div class="flex items-center gap-3 mb-4">
+        <div class="size-10 rounded-lg bg-primary/20 flex items-center justify-center">
+            <span class="material-symbols-outlined text-primary">settings_ethernet</span>
+        </div>
+        <div>
+            <h3 class="text-lg font-bold text-white">Network Interface</h3>
+            <p class="text-gray-500 text-sm">Select the interface to monitor</p>
+        </div>
+    </div>
+    <div class="flex items-center gap-3">
+        <select id="interfaceSelect"
+            class="flex-1 bg-background border border-[#333] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary">
+            <option value="">Loading interfaces...</option>
+        </select>
+        <button id="applyInterfaceBtn"
+            class="flex items-center gap-2 px-4 py-2 bg-primary text-black font-bold rounded-lg hover:bg-white transition-colors text-sm">
+            <span class="material-symbols-outlined text-sm">check</span>
+            Apply
+        </button>
+    </div>
+    <p id="interfaceStatus" class="text-gray-500 text-xs mt-2"></p>
+</div>
+
 <!-- About Card -->
 <div class="bg-surface border border-[#333] rounded-xl p-6">
     <div class="flex items-start gap-6">

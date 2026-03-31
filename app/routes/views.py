@@ -31,6 +31,12 @@ def nodes():
     return render_template('nodes.html', nodes=nodes)
 
 
+@main_bp.route('/geo')
+def geo():
+    """Geo-IP world map page."""
+    return render_template('geo.html')
+
+
 @main_bp.route('/feed')
 def feed():
     """View live packet feed page."""
@@ -116,6 +122,13 @@ def api_export_threats():
             'Content-Type': 'text/csv; charset=utf-8'
         }
     )
+
+
+@main_bp.route('/api/nodes')
+def api_get_nodes():
+    """API endpoint to get active nodes as JSON."""
+    nodes = get_active_nodes(limit=100)
+    return jsonify({'success': True, 'nodes': nodes})
 
 
 @main_bp.route('/api/packets')

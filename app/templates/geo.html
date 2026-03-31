@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Geo Map - Sentinels{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-white tracking-tight uppercase">Geo IP Map</h2>
+        <p class="text-gray-400 mt-1">Real-time global traffic visualization</p>
+    </div>
+    <div class="flex items-center gap-4">
+        <span id="connCount" class="text-primary font-mono text-sm font-bold">0 connections</span>
+        <div class="flex items-center gap-2 text-gray-500 text-xs">
+            <span class="size-2 rounded-full bg-primary animate-pulse inline-block"></span>
+            Live
+        </div>
+    </div>
+</div>
+
+<!-- Map + Country Breakdown -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+    <!-- World Map -->
+    <div class="xl:col-span-2 bg-surface border border-[#333] rounded-xl p-4 relative overflow-hidden">
+        <div id="mapContainer" class="w-full" style="height:480px;">
+            <svg id="worldMap" style="width:100%;height:100%;"></svg>
+        </div>
+
+        <!-- Tooltip -->
+        <div id="mapTooltip"
+            class="absolute hidden bg-background border border-[#444] rounded-lg px-3 py-2 text-xs pointer-events-none z-20 shadow-lg min-w-[160px]">
+            <p id="ttIp" class="text-white font-mono font-bold mb-1"></p>
+            <p id="ttCountry" class="text-gray-400"></p>
+            <p id="ttCity" class="text-gray-500"></p>
+            <p id="ttPackets" class="text-primary font-bold mt-1"></p>
+            <p id="ttStatus" class="font-bold mt-0.5"></p>
+        </div>
+
+        <!-- Legend -->
+        <div class="absolute bottom-5 left-5 flex items-center gap-5 text-xs text-gray-500 bg-surface/80 px-3 py-1.5 rounded-lg border border-[#333]">
+            <div class="flex items-center gap-1.5">
+                <span class="size-2.5 rounded-full bg-primary inline-block"></span>
+                Clean
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="size-2.5 rounded-full bg-danger inline-block"></span>
+                Threat
+            </div>
+            <span class="text-gray-600">Size = traffic volume</span>
+        </div>
+
+        <!-- No data overlay -->
+        <div id="mapNoData"
+            class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 pointer-events-none">
+            <span class="material-symbols-outlined text-5xl mb-2 text-primary animate-pulse">public</span>
+            <p class="text-sm">Start monitoring to see connections on the map</p>
+        </div>
+    </div>
+
+    <!-- Country Breakdown -->
+    <div class="bg-surface border border-[#333] rounded-xl overflow-hidden flex flex-col">
+        <div class="p-4 border-b border-[#333] flex-shrink-0">
+            <h3 class="text-lg font-bold text-white">Country Breakdown</h3>
+            <p class="text-gray-500 text-sm">Grouped by total traffic</p>
+        </div>
+        <div class="overflow-y-auto flex-1" style="max-height:432px;">
+            <table class="w-full text-sm">
+                <thead class="sticky top-0 bg-surface z-10">
+                    <tr class="border-b border-[#333]">
+                        <th class="px-4 py-2 text-left text-gray-500 font-medium">Country</th>
+                        <th class="px-4 py-2 text-right text-gray-500 font-medium">IPs</th>
+                        <th class="px-4 py-2 text-right text-gray-500 font-medium">Pkts</th>
+                        <th class="px-4 py-2 text-center text-gray-500 font-medium">⚠</th>
+                    </tr>
+                </thead>
+                <tbody id="countryTableBody">
+                    <tr>
+                        <td colspan="4" class="px-4 py-10 text-center text-gray-600 text-xs">
+                            Waiting for data...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Active Connections Table -->
+<div class="bg-surface border border-[#333] rounded-xl overflow-hidden">
+    <div class="p-4 border-b border-[#333] flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white">Active Connections</h3>
+        <span id="ipListCount" class="text-gray-500 text-sm">0 IPs</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="border-b border-[#333]">
+                <tr>
+                    <th class="px-4 py-3 text-left text-gray-500 font-medium">IP</th>
+                    <th class="px-4 py-3 text-left text-gray-500 font-medium">Country</th>
+                    <th class="px-4 py-3 text-left text-gray-500 font-medium">City</th>
+                    <th class="px-4 py-3 text-right text-gray-500 font-medium">Packets</th>
+                    <th class="px-4 py-3 text-center text-gray-500 font-medium">Status</th>
+                </tr>
+            </thead>
+            <tbody id="ipListTableBody">
+                <tr>
+                    <td colspan="5" class="px-4 py-8 text-center text-gray-600">No connections yet</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/d3.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/topojson-client.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/geo.js') }}"></script>
+{% endblock %}

@@ -18,12 +18,15 @@ _mac_lookup = None
 try:
     from mac_vendor_lookup import MacLookup
     _mac_lookup = MacLookup()
-    # Update vendor database in background
-    try:
-        _mac_lookup.update_vendors()
-        print('[Nodes] MAC vendor database updated')
-    except Exception:
-        print('[Nodes] Using cached MAC vendor database')
+    # Update vendor database in background (non-blocking — download can hang without internet)
+    def _update_vendors():
+        try:
+            _mac_lookup.update_vendors()
+            print('[Nodes] MAC vendor database updated')
+        except Exception:
+            print('[Nodes] Using cached MAC vendor database')
+    import threading as _threading
+    _threading.Thread(target=_update_vendors, daemon=True).start()
 except ImportError:
     print('[Nodes] mac-vendor-lookup not installed, vendor lookup disabled')
 

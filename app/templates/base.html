@@ -121,6 +121,14 @@
                 </a>
 
                 <a class="flex items-center gap-4 px-3 py-3 rounded-lg transition-all
+                {% if current_page == 'main.geo' %}bg-primary/10 border-l-2 border-primary text-primary
+                {% else %}text-gray-400 hover:text-white hover:bg-surface-highlight{% endif %}"
+                    href="{{ url_for('main.geo') }}">
+                    <span class="material-symbols-outlined">public</span>
+                    <span class="ml-3 text-sm font-medium tracking-wide">Geo Map</span>
+                </a>
+
+                <a class="flex items-center gap-4 px-3 py-3 rounded-lg transition-all
                 {% if current_page == 'main.logs' %}bg-danger/10 border-l-2 border-danger text-danger
                 {% else %}text-gray-400 hover:text-danger hover:bg-danger/10{% endif %}"
                     href="{{ url_for('main.logs') }}">
