@@ -14,8 +14,9 @@ const COLOR_CLEAN  = '#0df269';
 const COLOR_THREAT = '#ff2a2a';
 
 function radiusScale(packets, maxPackets) {
-    if (!maxPackets || maxPackets === 0) return 5;
-    return 4 + Math.sqrt(packets / maxPackets) * 22;
+    if (!maxPackets || maxPackets === 0) return 4;
+    // Use sqrt scaling with a tight cap so circles never dominate the map
+    return 3 + Math.sqrt(packets / maxPackets) * 11;
 }
 
 // ===== Map Initialisation =====
@@ -86,7 +87,8 @@ function updateMap() {
     // Only connections with valid lat/lon can be plotted
     const plotable = connections.filter(c => c.geo && c.geo.lat != null && c.geo.lon != null);
 
-    const maxPkts = d3.max(plotable, d => d.count) || 1;
+    // Scale against global max (all connections) so lone dots don't inflate
+    const maxPkts = d3.max(connections, d => d.count) || 1;
 
     // Update overlay message based on state
     const noData     = document.getElementById('mapNoData');
@@ -292,10 +294,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCountryTable();
         updateIPList();
 
-        // Trigger geo resolution for public IPs not yet resolved (max 40/refresh to respect rate limit)
+        // Trigger geo resolution for public IPs not yet resolved.
+        // ip-api.com free tier: 45 req/min — send 8 per 5s cycle (safe headroom)
         const unresolved = connections.filter(c =>
             c.geo && c.geo.country === 'Unknown' && c.geo.lat == null
-        ).slice(0, 40);
+        ).slice(0, 8);
         for (const conn of unresolved) {
             socket.emit('resolve_geo', { ip: conn.ip });
         }
