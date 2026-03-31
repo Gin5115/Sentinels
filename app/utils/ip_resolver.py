@@ -212,10 +212,13 @@ class IPResolver:
     def resolve_geo_async(self, ip: str, callback):
         """Resolve geo-location asynchronously."""
         def worker():
-            result = self.resolve_geo(ip)
+            result = dict(self.resolve_geo(ip))
             result['ip'] = ip
+            # ensure lat/lon are always present in the result
+            result.setdefault('lat', None)
+            result.setdefault('lon', None)
             callback(result)
-        
+
         thread = threading.Thread(target=worker, daemon=True)
         thread.start()
     

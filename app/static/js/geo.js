@@ -88,9 +88,20 @@ function updateMap() {
 
     const maxPkts = d3.max(plotable, d => d.count) || 1;
 
-    // Hide "no data" overlay if we have anything to show
-    const noData = document.getElementById('mapNoData');
-    if (noData) noData.style.display = plotable.length > 0 ? 'none' : '';
+    // Update overlay message based on state
+    const noData     = document.getElementById('mapNoData');
+    const noDataText = document.getElementById('mapNoDataText');
+    if (noData) {
+        if (plotable.length > 0) {
+            noData.style.display = 'none';
+        } else if (connections.length > 0) {
+            noData.style.display = '';
+            if (noDataText) noDataText.textContent = 'Resolving IP locations... dots will appear for public IPs';
+        } else {
+            noData.style.display = '';
+            if (noDataText) noDataText.textContent = 'Start monitoring to see connections on the map';
+        }
+    }
 
     const tooltip  = document.getElementById('mapTooltip');
     const ttIp     = document.getElementById('ttIp');
@@ -280,6 +291,31 @@ document.addEventListener('DOMContentLoaded', () => {
         updateMap();
         updateCountryTable();
         updateIPList();
+
+        // Trigger geo resolution for public IPs not yet resolved (max 40/refresh to respect rate limit)
+        const unresolved = connections.filter(c =>
+            c.geo && c.geo.country === 'Unknown' && c.geo.lat == null
+        ).slice(0, 40);
+        for (const conn of unresolved) {
+            socket.emit('resolve_geo', { ip: conn.ip });
+        }
+    });
+
+    // When a geo result comes back, update that connection and re-render
+    socket.on('geo_resolved', result => {
+        const conn = connections.find(c => c.ip === result.ip);
+        if (conn && result.country && result.country !== 'Unknown') {
+            conn.geo = {
+                country: result.country,
+                city:    result.city    || '',
+                flag:    result.flag    || '🌐',
+                lat:     result.lat     || null,
+                lon:     result.lon     || null
+            };
+            updateMap();
+            updateCountryTable();
+            updateIPList();
+        }
     });
 
     // Refresh every 5 seconds
