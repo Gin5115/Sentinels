@@ -11,4 +11,4 @@ app = create_app(config_name)
 
 if __name__ == '__main__':
     # Run with SocketIO support
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, use_reloader=False, host='0.0.0.0', port=5000)
