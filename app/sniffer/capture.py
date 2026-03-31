@@ -324,7 +324,7 @@ class PacketSniffer:
             interfaces = _get_if_list()
             
             # Skip these virtual/inactive interfaces
-            skip_keywords = ['virtual', 'loopback', 'bluetooth', 'vmware', 'virtualbox', 'hyper-v', 'pseudo']
+            skip_keywords = ['virtual', 'loopback', 'bluetooth', 'vmware', 'virtualbox', 'hyper-v', 'pseudo', 'lo']
             
             # Priority order: Wi-Fi first, then Ethernet
             priority_order = [
@@ -344,10 +344,11 @@ class PacketSniffer:
                     if any(skip in name or skip in desc for skip in skip_keywords):
                         continue
                     
-                    # Check for valid IPv4 (not link-local 169.254.x.x)
+                    # Check for valid IPv4 (not loopback, link-local, or unspecified)
                     has_valid_ipv4 = any(
-                        not ip.startswith('fe80') and 
-                        not ip.startswith('169.254') and 
+                        not ip.startswith('fe80') and
+                        not ip.startswith('169.254') and
+                        not ip.startswith('127.') and
                         ':' not in ip and
                         ip != '0.0.0.0'
                         for ip in ips

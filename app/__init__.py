@@ -13,7 +13,7 @@ def create_app(config_name='default'):
     app.config.from_object(config[config_name])
     
     # Initialize extensions - use 'threading' mode for Scapy compatibility
-    socketio.init_app(app, async_mode='threading', cors_allowed_origins='*')
+    socketio.init_app(app, async_mode='threading', cors_allowed_origins='*', allow_upgrades=False)
     
     # Initialize database
     from app.models.threat import init_db
