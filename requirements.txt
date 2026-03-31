@@ -14,5 +14,8 @@ mac-vendor-lookup>=0.0.7
 # System Resource Monitoring
 psutil>=5.9.0
 
+# HTTP Client (for geo-IP resolution)
+requests>=2.31.0
+
 # Environment Configuration
 python-dotenv>=1.0.0
