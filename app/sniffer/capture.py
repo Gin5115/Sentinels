@@ -13,6 +13,9 @@ from scapy.all import sniff, IP, IPv6, TCP, UDP, Ether, Raw, conf
 from app.utils.stats_manager import traffic_stats
 from app.utils.threat_engine import get_threat_engine
 from app.utils.ip_resolver import get_resolver
+from app.utils.flow_tracker import get_flow_tracker
+from app.utils.ml_engine import get_ml_engine
+from app.utils.detection_config import get_detection_mode
 
 
 def detect_threats(packet_data):
@@ -213,9 +216,12 @@ class PacketSniffer:
         traffic_stats.update(packet_data.get('dst_ip'), packet_data.get('protocol'))
         
         # Heuristic threat detection (ThreatEngine)
-        threat_engine = get_threat_engine()
-        heuristic_threat = threat_engine.analyze_packet(packet_data)
-        
+        mode = get_detection_mode()
+        heuristic_threat = None
+        if mode in ('heuristic', 'both'):
+            threat_engine = get_threat_engine()
+            heuristic_threat = threat_engine.analyze_packet(packet_data)
+
         if heuristic_threat:
             # Enrich with geo-location
             resolver = get_resolver()
@@ -235,12 +241,51 @@ class PacketSniffer:
                 severity=heuristic_threat.get('severity', 'Medium').upper(),
                 description=heuristic_threat.get('description'),
                 packet_size=packet_data.get('len'),
-                payload=packet_data.get('payload')
+                payload=packet_data.get('payload'),
+                detection_method='Heuristic',
             )
             
             # Emit threat alert via callback (will be handled by socket_events)
             packet_data['heuristic_threat'] = heuristic_threat
         
+        # ── ML Flow Classification ─────────────────────────────────────────────
+        # Feed packet into the flow tracker; it returns any flows that just
+        # completed (via FIN/RST or timeout).  Each completed flow is scored
+        # by the Random Forest — if non-Normal, emit as a threat.
+        ml_engine = get_ml_engine()
+        if mode in ('ml', 'both') and ml_engine.is_loaded():
+            completed_flows = get_flow_tracker().update(packet_data)
+            for flow in completed_flows:
+                pkts = flow.fwd_packets + flow.bwd_packets
+                dur  = round(flow.last_time - flow.start_time, 3)
+                print(f'[ML] Flow completed: {flow.src_ip}:{flow.src_port} → '
+                      f'{flow.dst_ip}:{flow.dst_port} | {pkts} pkts | {dur}s')
+                ml_threat = ml_engine.classify_flow(flow)
+                print(f'[ML] Classification: {ml_threat["type"] if ml_threat else "Normal (no threat)"}')
+                if ml_threat:
+                    resolver = get_resolver()
+                    geo = resolver.resolve_geo(ml_threat['ip'])
+                    ml_threat['location'] = geo.get('country', 'Unknown')
+                    ml_threat['city'] = geo.get('city', 'Unknown')
+                    ml_threat['flag'] = geo.get('flag', '🌐')
+                    ml_threat['timestamp'] = packet_data.get('timestamp')
+
+                    from app.models.threat import log_threat
+                    log_threat(
+                        source_ip=ml_threat.get('ip'),
+                        destination_ip=ml_threat.get('dst_ip'),
+                        protocol=ml_threat.get('protocol'),
+                        threat_type=ml_threat.get('type'),
+                        severity=ml_threat.get('severity', 'MEDIUM'),
+                        description=ml_threat.get('description'),
+                        packet_size=packet_data.get('len'),
+                        payload=packet_data.get('payload'),
+                        detection_method='ML',
+                    )
+
+                    # Attach to packet_data so socket_events can broadcast it
+                    packet_data.setdefault('ml_threats', []).append(ml_threat)
+
         # Pass packet data to the callback function
         if self.callback_func:
             self.callback_func(packet_data)

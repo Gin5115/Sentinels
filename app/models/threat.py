@@ -36,7 +36,8 @@ def init_db():
             severity TEXT,
             description TEXT,
             packet_size INTEGER,
-            payload TEXT
+            payload TEXT,
+            detection_method TEXT DEFAULT 'Heuristic'
         );
     ''')
     # Add indexes for performance
@@ -48,8 +49,9 @@ def init_db():
     print('[Database] Threats table initialized')
 
 
-def log_threat(source_ip, destination_ip, protocol, threat_type, 
-               severity='MEDIUM', description=None, packet_size=None, payload=None):
+def log_threat(source_ip, destination_ip, protocol, threat_type,
+               severity='MEDIUM', description=None, packet_size=None,
+               payload=None, detection_method='Heuristic'):
     """
     Log a new threat to the database.
     
@@ -70,27 +72,24 @@ def log_threat(source_ip, destination_ip, protocol, threat_type,
     cursor = conn.cursor()
     
     # Check if payload column exists (migration for existing DB)
+    # Run migrations for any missing columns on existing DBs
+    for col, typedef in [('payload', 'TEXT'), ('detection_method', "TEXT DEFAULT 'Heuristic'")]:
+        try:
+            cursor.execute(f'ALTER TABLE threats ADD COLUMN {col} {typedef}')
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
     try:
         cursor.execute('''
-            INSERT INTO threats (source_ip, destination_ip, protocol, threat_type, 
-                                severity, description, packet_size, payload)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (source_ip, destination_ip, protocol, threat_type, 
-              severity, description, packet_size, payload))
-    except sqlite3.OperationalError:
-        # Likely missing column, try to add it
-        try:
-            cursor.execute('ALTER TABLE threats ADD COLUMN payload TEXT')
-            conn.commit()
-            # Retry insert
-            cursor.execute('''
-                INSERT INTO threats (source_ip, destination_ip, protocol, threat_type, 
-                                    severity, description, packet_size, payload)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (source_ip, destination_ip, protocol, threat_type, 
-                  severity, description, packet_size, payload))
-        except Exception as e:
-            print(f'[Database] Error adding payload column: {e}')
+            INSERT INTO threats (source_ip, destination_ip, protocol, threat_type,
+                                severity, description, packet_size, payload,
+                                detection_method)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (source_ip, destination_ip, protocol, threat_type,
+              severity, description, packet_size, payload, detection_method))
+    except Exception as e:
+        print(f'[Database] Error logging threat: {e}')
             
     conn.commit()
     threat_id = cursor.lastrowid

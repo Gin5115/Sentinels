@@ -3,6 +3,7 @@ Flask routes for the Sentinels Network Traffic Analyzer.
 """
 import csv
 import io
+import os
 import sys
 from flask import render_template, jsonify, request, Response
 from app.routes import main_bp
@@ -78,6 +79,11 @@ def api_delete_threat(threat_id):
 def api_clear_threats():
     """API endpoint to clear all threat history."""
     count = clear_threat_history()
+    # Reset the in-memory counter so dashboard stays in sync
+    from app.events.socket_events import socketio
+    import app.events.socket_events as _se
+    _se.THREAT_COUNT = 0
+    socketio.emit('threat_count_reset', {'threat_count': 0}, namespace='/')
     return jsonify({'success': True, 'deleted_count': count})
 
 
@@ -215,6 +221,115 @@ def api_resolve_geo(ip):
         'success': True,
         'geo': geo
     })
+
+
+@main_bp.route('/api/ml/status')
+def api_ml_status():
+    """Return ML engine status (model loaded, classes, etc.)."""
+    from app.utils.ml_engine import get_ml_engine
+    status = get_ml_engine().get_status()
+    return jsonify({'success': True, 'ml': status})
+
+
+
+@main_bp.route('/api/ml/reload', methods=['POST'])
+def api_ml_reload():
+    """Reload the model from the default path on disk."""
+    from app.utils.ml_engine import get_ml_engine
+    engine = get_ml_engine()
+    ok = engine.load_model()   # reloads from default path
+    if ok:
+        return jsonify({'success': True, 'ml': engine.get_status()})
+    return jsonify({'success': False, 'error': f'Model file not found at {engine._model_path}'}), 404
+
+
+@main_bp.route('/api/ml/remove', methods=['POST'])
+def api_ml_remove():
+    """Delete the installed model file and disable ML detection."""
+    dest = os.path.normpath(_ML_MODEL_PATH)
+    if os.path.exists(dest):
+        os.remove(dest)
+
+    # Reset singleton state without unloading (keep object alive)
+    from app.utils import ml_engine as _me
+    if _me._ml_engine_instance:
+        inst = _me._ml_engine_instance
+        inst._model = None
+        inst._label_encoder = None
+        inst._features = None
+        inst._loaded = False
+        inst._classes = []
+
+    return jsonify({'success': True, 'message': 'Model removed'})
+
+
+@main_bp.route('/api/debug/ml')
+def api_debug_ml():
+    """
+    Diagnostic endpoint — shows ML engine state and runs a dummy prediction
+    so you can confirm the model is loaded and responding.
+    """
+    from app.utils.ml_engine import get_ml_engine
+    from app.utils.flow_tracker import get_flow_tracker
+    from app.utils.detection_config import get_detection_mode
+    import numpy as np
+
+    engine = get_ml_engine()
+    status = engine.get_status()
+    tracker = get_flow_tracker()
+
+    result = {
+        'model_loaded': status['loaded'],
+        'model_path': status['model_path'],
+        'classes': status['classes'],
+        'detection_mode': get_detection_mode(),
+        'active_flows': len(tracker._flows),
+    }
+
+    # Run a dummy prediction if model is loaded
+    if status['loaded']:
+        try:
+            # Craft a feature vector that looks like a DoS flow
+            dummy = {f: 0.0 for f in engine._features}
+            dummy['Total Fwd Packets']       = 300.0
+            dummy['Flow Packets/s']          = 5000.0
+            dummy['Flow Bytes/s']            = 200000.0
+            dummy['SYN Flag Count']          = 1.0
+            dummy['RST Flag Count']          = 1.0
+            dummy['Average Packet Size']     = 400.0
+
+            vec = np.array([[dummy.get(f, 0.0) for f in engine._features]], dtype=float)
+            vec = np.nan_to_num(vec, nan=0.0, posinf=1e9, neginf=0.0)
+            idx   = engine._model.predict(vec)[0]
+            label = engine._label_encoder.inverse_transform([idx])[0]
+            proba = float(engine._model.predict_proba(vec)[0].max())
+
+            result['test_prediction'] = {
+                'label': label,
+                'confidence': round(proba * 100, 1),
+                'status': 'ok'
+            }
+        except Exception as exc:
+            result['test_prediction'] = {'status': 'error', 'error': str(exc)}
+
+    return jsonify({'success': True, 'debug': result})
+
+
+@main_bp.route('/api/settings/detection', methods=['GET'])
+def api_get_detection_mode():
+    """Return the current detection mode."""
+    from app.utils.detection_config import get_detection_mode
+    return jsonify({'success': True, 'mode': get_detection_mode()})
+
+
+@main_bp.route('/api/settings/detection', methods=['POST'])
+def api_set_detection_mode():
+    """Set the detection mode: 'heuristic', 'ml', or 'both'."""
+    from app.utils.detection_config import set_detection_mode
+    mode = (request.get_json(silent=True) or {}).get('mode', '')
+    if set_detection_mode(mode):
+        return jsonify({'success': True, 'mode': mode})
+    return jsonify({'success': False, 'error': f'Invalid mode "{mode}". Use heuristic, ml, or both.'}), 400
 
 
 @main_bp.route('/api/threat/<int:threat_id>')

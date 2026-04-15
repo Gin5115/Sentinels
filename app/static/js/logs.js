@@ -82,6 +82,22 @@ function buildSeverityHTML(severity) {
 }
 
 /**
+ * Build the "Detected By" badge cell.
+ * @param {string|null} method
+ * @returns {string}
+ */
+function buildDetectionMethodHTML(method) {
+    if (method === 'ML') {
+        return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold bg-purple-500/20 text-purple-400 border border-purple-500/40">
+                    <span class="material-symbols-outlined text-[12px]">model_training</span>ML
+                </span>`;
+    }
+    return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/40">
+                <span class="material-symbols-outlined text-[12px]">rule</span>Heuristic
+            </span>`;
+}
+
+/**
  * Build the HTML for a single threat table row, mirroring the Jinja2 template.
  * @param {Object} threat
  * @returns {string}
@@ -110,6 +126,7 @@ function buildRowHTML(threat) {
                 </span>
             </td>
             <td class="px-6 py-4">${buildSeverityHTML(threat.severity)}</td>
+            <td class="px-6 py-4">${buildDetectionMethodHTML(threat.detection_method)}</td>
             <td class="px-6 py-4 text-center align-middle">
                 <div class="flex items-center justify-center gap-2">
                     <button onclick="showThreatDetails('${threat.id}')"
@@ -169,7 +186,7 @@ async function refreshLogs() {
         if (threats.length === 0) {
             tbody.innerHTML = `
                 <tr id="emptyState">
-                    <td colspan="8" class="px-6 py-16 text-center text-gray-500">
+                    <td colspan="9" class="px-6 py-16 text-center text-gray-500">
                         <span class="material-symbols-outlined text-5xl mb-3 block text-primary">verified_user</span>
                         <p class="text-lg font-medium text-gray-400">No threats detected</p>
                         <p class="text-sm">Your network is secure. Threats will appear here when detected.</p>

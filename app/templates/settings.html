@@ -88,6 +88,92 @@
     <p id="interfaceStatus" class="text-gray-500 text-xs mt-2"></p>
 </div>
 
+<!-- ML Model Card -->
+<div class="bg-surface border border-[#333] rounded-xl p-6" id="mlModelCard">
+    <div class="flex items-center gap-3 mb-4">
+        <div class="size-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+            <span class="material-symbols-outlined text-purple-400">model_training</span>
+        </div>
+        <div>
+            <h3 class="text-lg font-bold text-white">ML Threat Classifier</h3>
+            <p class="text-gray-500 text-sm">Random Forest trained on CICIDS-2017</p>
+        </div>
+        <div class="ml-auto">
+            <span id="mlStatusBadge" class="px-2 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-400">
+                Checking...
+            </span>
+        </div>
+    </div>
+
+    <!-- Model loaded -->
+    <div id="mlLoaded" class="hidden">
+        <p class="text-gray-400 text-sm mb-2">Detected classes:</p>
+        <div id="mlClasses" class="flex flex-wrap gap-2 mb-4"></div>
+        <p class="text-gray-500 text-xs mb-4">
+            Model file: <code class="text-purple-400 bg-purple-500/10 px-1 rounded">app/ml/sentinels_rf_model.pkl</code>
+        </p>
+        <button id="mlReloadBtn"
+                class="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-400 font-bold rounded-lg hover:bg-purple-500/30 transition-colors border border-purple-500/40 text-sm">
+            <span class="material-symbols-outlined text-sm">refresh</span>
+            Reload Model
+        </button>
+    </div>
+
+    <!-- Model not loaded -->
+    <div id="mlNotLoaded" class="hidden">
+        <p class="text-gray-400 text-sm mb-3">
+            No model found at
+            <code class="text-purple-400 bg-purple-500/10 px-1 rounded">app/ml/sentinels_rf_model.pkl</code>.
+            Train one using <code class="text-purple-400 bg-purple-500/10 px-1 rounded">train_model.py</code>,
+            place the resulting <code class="text-purple-400 bg-purple-500/10 px-1 rounded">sentinels_rf_model.pkl</code>
+            in that folder, then reload.
+        </p>
+        <button id="mlReloadBtn"
+                class="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-400 font-bold rounded-lg hover:bg-purple-500/30 transition-colors border border-purple-500/40 text-sm">
+            <span class="material-symbols-outlined text-sm">refresh</span>
+            Try Load from Disk
+        </button>
+    </div>
+
+    <p id="mlMessage" class="text-sm mt-3 hidden"></p>
+</div>
+
+<!-- Detection Mode Card -->
+<div class="bg-surface border border-[#333] rounded-xl p-6">
+    <div class="flex items-center gap-3 mb-4">
+        <div class="size-10 rounded-lg bg-primary/20 flex items-center justify-center">
+            <span class="material-symbols-outlined text-primary">tune</span>
+        </div>
+        <div>
+            <h3 class="text-lg font-bold text-white">Detection Mode</h3>
+            <p class="text-gray-500 text-sm">Choose which engine analyses traffic</p>
+        </div>
+    </div>
+
+    <!-- Segmented control -->
+    <div class="inline-flex rounded-lg border border-[#333] overflow-hidden mb-4" id="detectionToggle">
+        <button data-mode="heuristic"
+            class="detection-btn flex items-center gap-2 px-5 py-2.5 text-sm font-bold transition-colors">
+            <span class="material-symbols-outlined text-[16px]">rule</span>
+            Heuristic Only
+        </button>
+        <button data-mode="both"
+            class="detection-btn flex items-center gap-2 px-5 py-2.5 text-sm font-bold transition-colors border-x border-[#333]">
+            <span class="material-symbols-outlined text-[16px]">join</span>
+            Both
+        </button>
+        <button data-mode="ml"
+            class="detection-btn flex items-center gap-2 px-5 py-2.5 text-sm font-bold transition-colors">
+            <span class="material-symbols-outlined text-[16px]">model_training</span>
+            ML Only
+        </button>
+    </div>
+
+    <!-- Description area -->
+    <p id="detectionDesc" class="text-gray-400 text-sm"></p>
+    <p id="detectionMsg" class="text-sm mt-2 hidden"></p>
+</div>
+
 <!-- About Card -->
 <div class="bg-surface border border-[#333] rounded-xl p-6">
     <div class="flex items-start gap-6">
@@ -133,4 +219,141 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+<script>
+// ── ML Model Status ───────────────────────────────────────────────────────────
+
+const mlStatusBadge = document.getElementById('mlStatusBadge');
+const mlNotLoaded   = document.getElementById('mlNotLoaded');
+const mlLoaded      = document.getElementById('mlLoaded');
+const mlClasses     = document.getElementById('mlClasses');
+const mlMessage     = document.getElementById('mlMessage');
+
+const CLASS_COLORS = {
+    Normal:       'bg-gray-700 text-gray-300',
+    DoS:          'bg-red-500/20 text-red-400',
+    PortScan:     'bg-yellow-500/20 text-yellow-400',
+    BruteForce:   'bg-orange-500/20 text-orange-400',
+    Botnet:       'bg-purple-500/20 text-purple-400',
+    WebAttack:    'bg-blue-500/20 text-blue-400',
+    Infiltration: 'bg-pink-500/20 text-pink-400',
+    Heartbleed:   'bg-red-700/30 text-red-300',
+    Other:        'bg-gray-500/20 text-gray-400',
+};
+
+function renderMlStatus(ml) {
+    if (ml.loaded) {
+        mlStatusBadge.textContent = 'Active';
+        mlStatusBadge.className = 'px-2 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400';
+        mlLoaded.classList.remove('hidden');
+        mlNotLoaded.classList.add('hidden');
+        mlClasses.innerHTML = ml.classes.map(c => {
+            const color = CLASS_COLORS[c] || 'bg-gray-700 text-gray-300';
+            return `<span class="px-2 py-1 rounded-full text-xs font-semibold ${color}">${c}</span>`;
+        }).join('');
+    } else {
+        mlStatusBadge.textContent = 'No Model';
+        mlStatusBadge.className = 'px-2 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-400';
+        mlNotLoaded.classList.remove('hidden');
+        mlLoaded.classList.add('hidden');
+    }
+}
+
+function showMlMessage(text, isError = false) {
+    mlMessage.textContent = text;
+    mlMessage.className = `text-sm mt-3 ${isError ? 'text-red-400' : 'text-green-400'}`;
+    mlMessage.classList.remove('hidden');
+    setTimeout(() => mlMessage.classList.add('hidden'), 4000);
+}
+
+// Fetch status on load
+fetch('/api/ml/status')
+    .then(r => r.json())
+    .then(data => { if (data.success) renderMlStatus(data.ml); })
+    .catch(() => {
+        mlStatusBadge.textContent = 'Error';
+        mlStatusBadge.className = 'px-2 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400';
+    });
+
+// Reload button — both states share the same id
+document.querySelectorAll('#mlReloadBtn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.querySelector('span.material-symbols-outlined').classList.add('animate-spin');
+        try {
+            // Re-import from default path by posting the path explicitly
+            const res = await fetch('/api/ml/reload', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                renderMlStatus(data.ml);
+                showMlMessage('Model loaded from disk successfully.');
+            } else {
+                showMlMessage(data.error || 'Failed to load model.', true);
+            }
+        } catch (e) {
+            showMlMessage('Network error.', true);
+        } finally {
+            btn.disabled = false;
+            btn.querySelector('span.material-symbols-outlined').classList.remove('animate-spin');
+        }
+    });
+});
+
+// ── Detection Mode Toggle ────────────────────────────────────────────────────
+
+const DETECTION_DESCRIPTIONS = {
+    heuristic: 'Rule-based engine only. Detects SYN/UDP/ICMP floods, port scans, and blacklisted ports using sliding-window counters. Fast, no model required.',
+    ml:        'Random Forest classifier only. Analyses completed network flows using 20 CICIDS-2017 features. Catches DoS, BruteForce, Botnet, WebAttack and more. Requires a loaded model.',
+    both:      'Both engines run independently. Heuristic catches volume-based attacks in real time; ML classifies completed flows for deeper pattern recognition. Recommended when a model is loaded.',
+};
+
+function applyDetectionMode(mode) {
+    const btns = document.querySelectorAll('.detection-btn');
+    btns.forEach(btn => {
+        const active = btn.dataset.mode === mode;
+        btn.className = `detection-btn flex items-center gap-2 px-5 py-2.5 text-sm font-bold transition-colors ${
+            btn.dataset.mode !== 'heuristic' ? 'border-x border-[#333]' : ''
+        } ${active
+            ? 'bg-primary text-black'
+            : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5'
+        }`;
+        // Keep border on middle button regardless of active state
+        if (btn.dataset.mode === 'both') {
+            btn.classList.add('border-x', 'border-[#333]');
+        }
+    });
+    document.getElementById('detectionDesc').textContent = DETECTION_DESCRIPTIONS[mode] || '';
+}
+
+async function setDetectionMode(mode) {
+    try {
+        const res = await fetch('/api/settings/detection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode })
+        });
+        const data = await res.json();
+        if (data.success) {
+            applyDetectionMode(mode);
+            const msg = document.getElementById('detectionMsg');
+            msg.textContent = `Detection mode set to: ${mode}`;
+            msg.className = 'text-sm mt-2 text-green-400';
+            msg.classList.remove('hidden');
+            setTimeout(() => msg.classList.add('hidden'), 3000);
+        }
+    } catch (e) {
+        console.error('Failed to set detection mode:', e);
+    }
+}
+
+// Load current mode on page load
+fetch('/api/settings/detection')
+    .then(r => r.json())
+    .then(data => { if (data.success) applyDetectionMode(data.mode); })
+    .catch(() => applyDetectionMode('both'));
+
+// Wire up buttons
+document.querySelectorAll('.detection-btn').forEach(btn => {
+    btn.addEventListener('click', () => setDetectionMode(btn.dataset.mode));
+});
+</script>
 {% endblock %}

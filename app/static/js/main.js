@@ -295,6 +295,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Sync threat counter when DB is cleared via Clear History
+    socket.on('threat_count_reset', (data) => {
+        state.threatCount = data.threat_count || 0;
+        if (elements.threatCount) {
+            elements.threatCount.textContent = state.threatCount;
+        }
+    });
+
     // Geo-location resolution response
     socket.on('geo_resolved', (data) => {
         if (data.ip) {
@@ -523,11 +531,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.protocolCounts[protocol]++;
             } else {
                 state.protocolCounts.OTHER++;
-            }
-
-            // Track threats
-            if (packet.is_threat) {
-                state.threatCount++;
             }
 
             // Track src_ip counts for Top Talkers

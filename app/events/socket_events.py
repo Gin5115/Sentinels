@@ -17,6 +17,8 @@ from app.models.nodes import update_node_stats, get_node_count, clear_node_stats
 from app.models.threat import clear_threat_history
 from app.utils.ip_resolver import get_resolver
 from app.utils.stats_manager import traffic_stats
+from app.utils.threat_engine import get_threat_engine
+from app.utils.flow_tracker import get_flow_tracker
 
 # Global state
 _sniffer = None
@@ -181,10 +183,6 @@ def emit_packet(packet_data):
     else:
         PROTOCOL_STATS['Other'] += 1
     
-    # Track threats
-    if packet_data.get('threat'):
-        THREAT_COUNT += 1
-    
     # Update node statistics with MAC address for fingerprinting
     update_node_stats(
         packet_data.get('src_ip'), 
@@ -221,6 +219,14 @@ def emit_packet(packet_data):
         if src:
             THREAT_IPS.add(src)
         socketio.emit('threat_alert', threat, namespace='/')
+
+    # Emit ML threat alerts (from RandomForest flow classifier)
+    for ml_threat in packet_data.get('ml_threats', []):
+        THREAT_COUNT += 1
+        src = ml_threat.get('ip')
+        if src:
+            THREAT_IPS.add(src)
+        socketio.emit('threat_alert', ml_threat, namespace='/')
 
 
 def get_sniffer():
@@ -265,6 +271,12 @@ def handle_connect():
             print(f'[Sentinels] ✗ ERROR starting sniffer: {e}')
             emit('error', {'message': f'Sniffer error: {str(e)}'})
     
+    # Sync in-memory threat count with actual DB count (prevents drift
+    # when Clear History is used without a full session restart)
+    from app.models.threat import get_threat_stats
+    global THREAT_COUNT
+    THREAT_COUNT = get_threat_stats().get('total', THREAT_COUNT)
+
     # Send initial stats to the newly connected client
     emit('init_stats', {
         'total_packets': TOTAL_PACKETS,
@@ -435,7 +447,11 @@ def handle_restart_session():
     clear_node_stats()
     clear_threat_history()
     PACKET_BUFFER.clear()
-    
+    traffic_stats.clear()
+    get_threat_engine().clear()
+    get_flow_tracker().clear()
+    get_resolver().clear_cache()
+
     print('[Sentinels] Session data cleared')
     
     # Broadcast to all clients
