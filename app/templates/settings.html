@@ -174,6 +174,37 @@
     <p id="detectionMsg" class="text-sm mt-2 hidden"></p>
 </div>
 
+<!-- Heuristic Thresholds Card -->
+<div class="bg-surface border border-[#333] rounded-xl p-6">
+    <div class="flex items-center gap-3 mb-4">
+        <div class="size-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+            <span class="material-symbols-outlined text-yellow-400">tune</span>
+        </div>
+        <div>
+            <h3 class="text-lg font-bold text-white">Heuristic Thresholds</h3>
+            <p class="text-gray-500 text-sm">Tune detection sensitivity — changes take effect immediately</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="heuristicFields">
+        <!-- injected by JS -->
+    </div>
+
+    <div class="flex items-center gap-3 mt-4">
+        <button id="heuristicSaveBtn"
+            class="flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-400 font-bold rounded-lg hover:bg-yellow-500/30 transition-colors border border-yellow-500/40 text-sm">
+            <span class="material-symbols-outlined text-sm">save</span>
+            Apply Changes
+        </button>
+        <button id="heuristicResetBtn"
+            class="flex items-center gap-2 px-4 py-2 bg-[#222] text-gray-400 font-bold rounded-lg hover:bg-[#333] transition-colors border border-[#444] text-sm">
+            <span class="material-symbols-outlined text-sm">restart_alt</span>
+            Reset Defaults
+        </button>
+        <p id="heuristicMsg" class="text-sm hidden"></p>
+    </div>
+</div>
+
 <!-- About Card -->
 <div class="bg-surface border border-[#333] rounded-xl p-6">
     <div class="flex items-start gap-6">
@@ -354,6 +385,89 @@ fetch('/api/settings/detection')
 // Wire up buttons
 document.querySelectorAll('.detection-btn').forEach(btn => {
     btn.addEventListener('click', () => setDetectionMode(btn.dataset.mode));
+});
+
+// ── Heuristic Thresholds ─────────────────────────────────────────────────────
+
+const HEURISTIC_LABELS = {
+    syn_flood_threshold:  { label: 'SYN Flood',       unit: 'pkts/window', min: 10,  max: 5000 },
+    udp_flood_threshold:  { label: 'UDP Flood',        unit: 'pkts/window', min: 50,  max: 10000 },
+    icmp_flood_threshold: { label: 'ICMP Flood',       unit: 'pkts/window', min: 10,  max: 5000 },
+    port_scan_threshold:  { label: 'Port Scan',        unit: 'unique ports', min: 5,  max: 200 },
+    window_duration:      { label: 'Window Duration',  unit: 'seconds',     min: 1,   max: 60 },
+    alert_cooldown:       { label: 'Alert Cooldown',   unit: 'seconds',     min: 1,   max: 60 },
+};
+
+const HEURISTIC_DEFAULTS = {
+    syn_flood_threshold: 100, udp_flood_threshold: 500,
+    icmp_flood_threshold: 300, port_scan_threshold: 10,
+    window_duration: 5, alert_cooldown: 5,
+};
+
+function renderHeuristicFields(data) {
+    const container = document.getElementById('heuristicFields');
+    container.innerHTML = Object.entries(HEURISTIC_LABELS).map(([key, meta]) => `
+        <div>
+            <label class="block text-xs text-gray-400 mb-1">${meta.label}
+                <span class="text-gray-600">(${meta.unit})</span>
+            </label>
+            <input type="number" id="h_${key}" name="${key}"
+                value="${data[key] ?? HEURISTIC_DEFAULTS[key]}"
+                min="${meta.min}" max="${meta.max}"
+                class="w-full bg-background border border-[#333] text-white rounded-lg px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-yellow-500/60">
+        </div>
+    `).join('');
+}
+
+function showHeuristicMsg(text, err = false) {
+    const el = document.getElementById('heuristicMsg');
+    el.textContent = text;
+    el.className = `text-sm ${err ? 'text-red-400' : 'text-green-400'}`;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 3500);
+}
+
+// Load on page open
+fetch('/api/settings/heuristic')
+    .then(r => r.json())
+    .then(d => { if (d.success) renderHeuristicFields(d.thresholds); })
+    .catch(() => renderHeuristicFields(HEURISTIC_DEFAULTS));
+
+document.getElementById('heuristicSaveBtn').addEventListener('click', async () => {
+    const payload = {};
+    Object.keys(HEURISTIC_LABELS).forEach(key => {
+        const el = document.getElementById('h_' + key);
+        if (el) payload[key] = parseFloat(el.value);
+    });
+    try {
+        const res = await fetch('/api/settings/heuristic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.success) {
+            renderHeuristicFields(data.thresholds);
+            showHeuristicMsg('Thresholds updated.');
+        } else {
+            showHeuristicMsg('Failed to update.', true);
+        }
+    } catch (e) { showHeuristicMsg('Network error.', true); }
+});
+
+document.getElementById('heuristicResetBtn').addEventListener('click', async () => {
+    try {
+        const res = await fetch('/api/settings/heuristic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(HEURISTIC_DEFAULTS),
+        });
+        const data = await res.json();
+        if (data.success) {
+            renderHeuristicFields(data.thresholds);
+            showHeuristicMsg('Defaults restored.');
+        }
+    } catch (e) { showHeuristicMsg('Network error.', true); }
 });
 </script>
 {% endblock %}

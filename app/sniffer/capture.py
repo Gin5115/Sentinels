@@ -252,10 +252,21 @@ class PacketSniffer:
         # Feed packet into the flow tracker; it returns any flows that just
         # completed (via FIN/RST or timeout).  Each completed flow is scored
         # by the Random Forest — if non-Normal, emit as a threat.
+        # LAN-to-LAN flows (172.x ↔ 172.x, 192.168.x ↔ 192.168.x, etc.) are
+        # skipped — they routinely produce BruteForce false-positives because
+        # mDNS / service-discovery flows match the brute-force feature profile.
+        def _is_lan(ip):
+            return (ip.startswith('192.168.') or ip.startswith('10.') or
+                    ip.startswith('172.') or ip.startswith('fe80:') or
+                    ip.startswith('fd') or ip in ('127.0.0.1', '::1'))
+
         ml_engine = get_ml_engine()
         if mode in ('ml', 'both') and ml_engine.is_loaded():
             completed_flows = get_flow_tracker().update(packet_data)
             for flow in completed_flows:
+                # Skip flows where both endpoints are private/LAN
+                if _is_lan(flow.src_ip) and _is_lan(flow.dst_ip):
+                    continue
                 pkts = flow.fwd_packets + flow.bwd_packets
                 dur  = round(flow.last_time - flow.start_time, 3)
                 print(f'[ML] Flow completed: {flow.src_ip}:{flow.src_port} → '

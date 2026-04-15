@@ -332,6 +332,22 @@ def api_set_detection_mode():
     return jsonify({'success': False, 'error': f'Invalid mode "{mode}". Use heuristic, ml, or both.'}), 400
 
 
+@main_bp.route('/api/settings/heuristic', methods=['GET'])
+def api_get_heuristic():
+    """Return current heuristic detection thresholds."""
+    from app.utils.threat_engine import get_threat_engine
+    return jsonify({'success': True, 'thresholds': get_threat_engine().get_thresholds()})
+
+
+@main_bp.route('/api/settings/heuristic', methods=['POST'])
+def api_set_heuristic():
+    """Update one or more heuristic thresholds."""
+    from app.utils.threat_engine import get_threat_engine
+    values = request.get_json(silent=True) or {}
+    updated = get_threat_engine().set_thresholds(values)
+    return jsonify({'success': True, 'thresholds': updated})
+
+
 @main_bp.route('/api/threat/<int:threat_id>')
 def api_get_threat_details(threat_id):
     """

@@ -339,7 +339,10 @@ function updateIPList() {
         return `
             <tr class="border-b border-[#2a2a2a] hover:bg-white/5 transition-colors cursor-pointer geo-ip-row"
                 data-ip="${esc(c.ip)}">
-                <td class="px-4 py-2.5 font-mono text-primary text-sm pointer-events-none">${esc(c.ip)}</td>
+                <td class="px-4 py-2.5 text-sm pointer-events-none">
+                    <span class="font-mono text-primary underline decoration-dotted underline-offset-2 hover:text-white transition-colors">${esc(c.ip)}</span>
+                    <span class="material-symbols-outlined text-[11px] text-gray-600 ml-1 align-middle">open_in_new</span>
+                </td>
                 <td class="px-4 py-2.5 text-gray-300 text-sm pointer-events-none">${geo.flag || ''} ${esc(geo.country || 'Unknown')}</td>
                 <td class="px-4 py-2.5 text-gray-500 text-sm pointer-events-none">${esc(geo.city || '—')}</td>
                 <td class="px-4 py-2.5 text-right font-mono text-white text-sm font-bold pointer-events-none">${c.count.toLocaleString()}</td>

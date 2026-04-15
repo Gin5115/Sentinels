@@ -176,25 +176,6 @@
                 <div class="space-y-3 pt-3 border-t border-[#333]">
                     <span class="text-xs text-gray-500 uppercase tracking-wider block mb-2">System Resources</span>
 
-                    <!-- CPU -->
-                    <div class="pb-2 mb-2 border-b border-[#333]">
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs text-gray-400">CPU</span>
-                            <div class="h-2 w-24 bg-[#222] rounded-full overflow-hidden">
-                                <div id="cpu-bar" class="h-full bg-primary rounded-full transition-all duration-300"
-                                    style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="flex justify-between text-xs text-gray-500">
-                            <span>App:</span>
-                            <span id="cpuApp" class="text-primary font-mono">0%</span>
-                        </div>
-                        <div class="flex justify-between text-xs text-gray-500">
-                            <span>Sys:</span>
-                            <span id="cpuSys" class="text-gray-400 font-mono">0%</span>
-                        </div>
-                    </div>
-
                     <!-- RAM -->
                     <div class="pb-2 mb-2 border-b border-[#333]">
                         <div class="flex items-center justify-between mb-1">
@@ -307,10 +288,6 @@
                 const statusText = document.getElementById('system-status-text');
 
                 // System resource elements
-                const cpuApp = document.getElementById('cpuApp');
-                const cpuSys = document.getElementById('cpuSys');
-                const cpuBar = document.getElementById('cpu-bar');
-
                 const ramApp = document.getElementById('ramApp');
                 const ramSys = document.getElementById('ramSys');
                 const ramBar = document.getElementById('ram-bar');
@@ -390,11 +367,6 @@
                 }
 
                 function updateSidebarStats(data) {
-                    // CPU
-                    if (cpuApp) cpuApp.textContent = data.cpu_script + '%';
-                    if (cpuSys) cpuSys.textContent = data.cpu_system + '%';
-                    if (cpuBar) cpuBar.style.width = Math.min(data.cpu_system, 100) + '%';
-
                     // RAM
                     if (ramApp) ramApp.textContent = data.ram_script_used;
                     if (ramSys) ramSys.textContent = `${data.ram_system_used} / ${data.ram_system_total}`;
@@ -440,6 +412,14 @@
 
                 globalSocket.on('session_restarted', () => {
                     updateUI(false);
+                    // Clear cached stats and reset display to reflect cleared state
+                    localStorage.removeItem('sysStats');
+                    if (ramApp) ramApp.textContent = '0 B';
+                    if (ramSys) ramSys.textContent = '— / —';
+                    if (ramBar) ramBar.style.width = '0%';
+                    if (diskApp) diskApp.textContent = '0 KB';
+                    if (diskSys) diskSys.textContent = '— / —';
+                    if (diskBar) diskBar.style.width = '0%';
                     showToast('Session Reset Successfully');
                 });
 

@@ -18,72 +18,68 @@
     </div>
 </div>
 
-<!-- Map + Country Breakdown -->
-<div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
-
-    <!-- World Map (takes 3 cols) -->
-    <div class="xl:col-span-3 bg-surface border border-[#333] rounded-xl p-4 relative overflow-hidden">
-        <div id="mapContainer" class="w-full" style="height:580px;">
-            <svg id="worldMap" style="width:100%;height:100%;"></svg>
-        </div>
-
-        <!-- Hover Tooltip -->
-        <div id="mapTooltip"
-            class="absolute hidden bg-background border border-[#444] rounded-lg px-3 py-2 text-xs pointer-events-none z-20 shadow-lg min-w-[160px]">
-            <p id="ttIp" class="text-white font-mono font-bold mb-1"></p>
-            <p id="ttCountry" class="text-gray-400"></p>
-            <p id="ttCity" class="text-gray-500"></p>
-            <p id="ttPackets" class="text-primary font-bold mt-1"></p>
-            <p id="ttStatus" class="font-bold mt-0.5"></p>
-            <p class="text-gray-600 mt-1.5 italic">Click for details</p>
-        </div>
-
-        <!-- Legend -->
-        <div class="absolute bottom-5 left-5 flex items-center gap-5 text-xs text-gray-500 bg-surface/80 px-3 py-1.5 rounded-lg border border-[#333]">
-            <div class="flex items-center gap-1.5">
-                <span class="size-2.5 rounded-full bg-primary inline-block"></span>
-                Clean
-            </div>
-            <div class="flex items-center gap-1.5">
-                <span class="size-2.5 rounded-full bg-danger inline-block"></span>
-                Threat
-            </div>
-            <span class="text-gray-600">Size = traffic volume</span>
-        </div>
-
-        <!-- No data overlay -->
-        <div id="mapNoData"
-            class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 pointer-events-none">
-            <span class="material-symbols-outlined text-5xl mb-2 text-primary animate-pulse">public</span>
-            <p id="mapNoDataText" class="text-sm">Start monitoring to see connections on the map</p>
-        </div>
+<!-- World Map -->
+<div class="bg-surface border border-[#333] rounded-xl p-4 relative overflow-hidden">
+    <div id="mapContainer" class="w-full" style="height:500px;">
+        <svg id="worldMap" style="width:100%;height:100%;"></svg>
     </div>
 
-    <!-- Country Breakdown -->
-    <div class="bg-surface border border-[#333] rounded-xl overflow-hidden flex flex-col">
-        <div class="p-4 border-b border-[#333] flex-shrink-0">
-            <h3 class="text-lg font-bold text-white">Country Breakdown</h3>
-            <p class="text-gray-500 text-sm">Click a row for IPs</p>
+    <!-- Hover Tooltip -->
+    <div id="mapTooltip"
+        class="absolute hidden bg-background border border-[#444] rounded-lg px-3 py-2 text-xs pointer-events-none z-20 shadow-lg min-w-[160px]">
+        <p id="ttIp" class="text-white font-mono font-bold mb-1"></p>
+        <p id="ttCountry" class="text-gray-400"></p>
+        <p id="ttCity" class="text-gray-500"></p>
+        <p id="ttPackets" class="text-primary font-bold mt-1"></p>
+        <p id="ttStatus" class="font-bold mt-0.5"></p>
+        <p class="text-gray-600 mt-1.5 italic">Click for details</p>
+    </div>
+
+    <!-- Legend -->
+    <div class="absolute bottom-5 left-5 flex items-center gap-5 text-xs text-gray-500 bg-surface/80 px-3 py-1.5 rounded-lg border border-[#333]">
+        <div class="flex items-center gap-1.5">
+            <span class="size-2.5 rounded-full bg-primary inline-block"></span>
+            Clean
         </div>
-        <div class="overflow-y-auto flex-1" style="max-height:532px;">
-            <table class="w-full text-sm">
-                <thead class="sticky top-0 bg-surface z-10">
-                    <tr class="border-b border-[#333]">
-                        <th class="px-3 py-2 text-left text-gray-500 font-medium">Country</th>
-                        <th class="px-3 py-2 text-right text-gray-500 font-medium">IPs</th>
-                        <th class="px-3 py-2 text-right text-gray-500 font-medium">Pkts</th>
-                        <th class="px-3 py-2 text-center text-gray-500 font-medium">⚠</th>
-                    </tr>
-                </thead>
-                <tbody id="countryTableBody">
-                    <tr>
-                        <td colspan="4" class="px-4 py-10 text-center text-gray-600 text-xs">
-                            Waiting for data...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        <div class="flex items-center gap-1.5">
+            <span class="size-2.5 rounded-full bg-danger inline-block"></span>
+            Threat
         </div>
+        <span class="text-gray-600">Size = traffic volume</span>
+    </div>
+
+    <!-- No data overlay -->
+    <div id="mapNoData"
+        class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 pointer-events-none">
+        <span class="material-symbols-outlined text-5xl mb-2 text-primary animate-pulse">public</span>
+        <p id="mapNoDataText" class="text-sm">Start monitoring to see connections on the map</p>
+    </div>
+</div>
+
+<!-- Country Breakdown -->
+<div class="bg-surface border border-[#333] rounded-xl overflow-hidden">
+    <div class="p-4 border-b border-[#333]">
+        <h3 class="text-lg font-bold text-white">Country Breakdown</h3>
+        <p class="text-gray-500 text-sm">Click a row to see IPs from that country</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="border-b border-[#333]">
+                <tr>
+                    <th class="px-4 py-3 text-left text-gray-500 font-medium">Country</th>
+                    <th class="px-4 py-3 text-right text-gray-500 font-medium">IPs</th>
+                    <th class="px-4 py-3 text-right text-gray-500 font-medium">Packets</th>
+                    <th class="px-4 py-3 text-center text-gray-500 font-medium">Threats</th>
+                </tr>
+            </thead>
+            <tbody id="countryTableBody">
+                <tr>
+                    <td colspan="4" class="px-4 py-10 text-center text-gray-600 text-xs">
+                        Waiting for data...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
