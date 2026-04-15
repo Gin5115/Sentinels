@@ -31,8 +31,10 @@ MONITORING_ACTIVE = False
 PROTOCOL_STATS = {'TCP': 0, 'UDP': 0, 'ICMP': 0, 'Other': 0}
 THREAT_IPS = set()  # IPs that have triggered at least one threat alert
 
-# Circular buffer for packet storage (50K max - rolling window)
+# Lightweight metadata ring buffer (50K entries, no payload)
 PACKET_BUFFER = deque(maxlen=50000)
+# Full-detail buffer for on-demand packet inspection (payload included)
+PACKET_DETAIL_BUFFER = deque(maxlen=1000)
 
 
 def _get_size(bytes_val):
@@ -192,11 +194,11 @@ def emit_packet(packet_data):
     
     # Add unique ID for on-demand lookup
     packet_data['id'] = TOTAL_PACKETS
-    
-    # Store FULL packet in circular buffer (for API fetch)
-    PACKET_BUFFER.append(packet_data)
-    
-    # Create LIGHTWEIGHT metadata for live feed (no payload = no bloat)
+
+    # Full packet (with payload) goes into small detail buffer only
+    PACKET_DETAIL_BUFFER.append(packet_data)
+
+    # Lightweight metadata (no payload) goes into the large ring buffer
     lightweight_packet = {
         'id': packet_data['id'],
         'timestamp': packet_data.get('timestamp'),
@@ -205,10 +207,13 @@ def emit_packet(packet_data):
         'protocol': packet_data.get('protocol'),
         'len': packet_data.get('len'),
         'is_threat': packet_data.get('is_threat', False),
-        'threat_type': packet_data.get('threat_type')
+        'threat_type': packet_data.get('threat_type'),
+        'src_port': packet_data.get('src_port'),
+        'dst_port': packet_data.get('dst_port'),
     }
-    
-    # Emit only lightweight data to all clients (huge RAM savings)
+    PACKET_BUFFER.append(lightweight_packet)
+
+    # Emit only lightweight data to all clients
     socketio.emit('new_packet', lightweight_packet, namespace='/')
     
     # Emit heuristic threat alerts (from ThreatEngine)
@@ -447,6 +452,7 @@ def handle_restart_session():
     clear_node_stats()
     clear_threat_history()
     PACKET_BUFFER.clear()
+    PACKET_DETAIL_BUFFER.clear()
     traffic_stats.clear()
     get_threat_engine().clear()
     get_flow_tracker().clear()

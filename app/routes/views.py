@@ -9,7 +9,7 @@ from flask import render_template, jsonify, request, Response
 from app.routes import main_bp
 from app.models.threat import get_all_threats, delete_threat, clear_threat_history
 from app.models.nodes import get_active_nodes
-from app.events.socket_events import PACKET_BUFFER
+from app.events.socket_events import PACKET_BUFFER, PACKET_DETAIL_BUFFER
 
 
 @main_bp.route('/')
@@ -194,8 +194,8 @@ def api_get_packet_details(packet_id):
     API endpoint to get FULL packet details including payload.
     Used when user clicks a row to view details (on-demand fetch).
     """
-    # Search buffer for packet with matching ID
-    for packet in PACKET_BUFFER:
+    # Search detail buffer (last 1000 full packets) for matching ID
+    for packet in PACKET_DETAIL_BUFFER:
         if packet.get('id') == packet_id:
             return jsonify({
                 'success': True,
