@@ -126,10 +126,12 @@ class MLEngine:
         if label == 'Normal':
             return None
 
-        # Require ≥35% confidence — low threshold is safe because Normal
-        # flows are already suppressed above; this only filters random
-        # noise from tiny flows where the model has no signal.
-        if confidence < 0.35:
+        # Require ≥60% confidence.
+        # Normal flows are already filtered above.
+        # 60% cuts borderline false positives from background app traffic
+        # (keepalives, short reconnects) while keeping real attack scores:
+        #   DoS 68%, BruteForce 94%, Botnet 90%, WebAttack 78%, PortScan 99%
+        if confidence < 0.60:
             return None
 
         severity = _SEVERITY.get(label, 'MEDIUM')
