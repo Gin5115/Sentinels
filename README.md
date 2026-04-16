@@ -1,258 +1,180 @@
-# SENTINELS — Network Traffic Analyzer & IDS
+# Sentinels
 
-> Real-time packet capture, heuristic threat detection, geo-IP visualization, and live device tracking — running locally in your browser.
+Self-hosted network intrusion detection system with dual-layer heuristic + ML threat detection and a real-time web dashboard.
 
----
+![Python](https://img.shields.io/badge/Python-3.8+-blue)
+![Flask](https://img.shields.io/badge/Flask-3.x-lightgrey)
+![scikit--learn](https://img.shields.io/badge/scikit--learn-RandomForest-orange)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Overview
 
-Sentinels is a self-hosted **Network Intrusion Detection System (NIDS)** built for security professionals and students. It captures every packet on your network interface in real time, runs them through a heuristic threat engine, and presents everything through a modern dark-themed web dashboard — no cloud, no subscriptions, no agents.
+Sentinels is a self-hosted **Network Intrusion Detection System (NIDS)** that captures every packet on your network interface in real time and runs them through two independent detection layers: a stateful heuristic engine and a Random Forest ML model trained on CICIDS-2017 attack patterns. Everything is presented through a modern dark-themed web dashboard — no cloud, no subscriptions, no agents.
 
-The entire stack runs locally. Start it with `sudo python run.py`, open `http://localhost:5000`, and you have full visibility into your network within seconds.
+Start it with `sudo python run.py`, open `http://localhost:5000`, and you have full network visibility within seconds.
 
----
+### Key Features
 
-## Features
-
-### Real-Time Monitoring
-- Live packet capture via **Scapy** at the kernel level
-- Virtual-scrolling live feed handles 50,000+ packets without lag
-- Protocol distribution (TCP / UDP / ICMP / Other) updated in real time
-- Top-talker chart showing highest-traffic IPs
-- Packet rate badge (packets/sec)
-
-### Threat Detection Engine
-Five independent heuristic rules running on every packet:
-
-| Rule | Trigger | Severity |
-|------|---------|----------|
-| SYN Flood | > 100 SYN-only packets / 5s from one IP | High |
-| UDP Flood | > 500 UDP packets / 5s from public IP | Medium |
-| ICMP Flood | > 300 ICMP packets / 5s from public IP | Medium |
-| Port Scan | > 10 unique destination ports / 5s from one IP | Low |
-| Blacklisted Port Access | Any connection to Telnet / RDP / SMB / Redis / MongoDB / MySQL / PostgreSQL | Info |
-
-All threats are persisted to SQLite with full packet metadata and exportable to CSV.
-
-### Geo-IP World Map
-- **D3.js** Natural Earth projection rendered fully locally (no CDN)
-- Animated circles on the map per resolved public IP
-- Circle **size** = traffic volume (sqrt scale)
-- Circle **colour** = green (clean) / red (flagged threat IP)
-- Click any circle → popup with IP, city, coordinates, packet count, status
-- Click any country row → popup listing every IP from that country
-- Country breakdown table sorted by traffic volume
-- IPs resolved incrementally via `ip-api.com` (8 per 5s cycle, rate-limit safe)
-
-### Local Device Discovery
-- Tracks every private IP (RFC 1918) seen in traffic
-- Resolves MAC address → manufacturer via offline OUI database
-- Reverse-DNS hostname lookup
-- Per-device packet count, bytes transferred, last-seen timestamp
-- Auto-refreshes every 5 seconds without page reload
-
-### Live Packet Feed
-- Filter by protocol (TCP / UDP / ICMP / Other)
-- Filter by IP address (source or destination)
-- Click any row for full packet details modal (payload, flags, ports, timestamps)
-- Pause / resume capture without stopping the sniffer
-
-### Settings & Controls
-- **Network interface selector** — switch capture interface without restart
-- **Session restart** — clear all in-memory stats and start fresh
-- **CSV export** — download all threat records with timestamps and metadata
-- **Database wipe** — one-click clear of threat history
-
----
+- **Dual-Layer Detection**: heuristic sliding-window rules + Random Forest ML model run in parallel, or toggle either on/off from the Settings page at runtime.
+- **Machine Learning Engine**: Random Forest (200 trees) trained on CICIDS-2017 features — detects DoS, PortScan, BruteForce, Botnet, WebAttack, Infiltration, Heartbleed with per-class confidence scores.
+- **Local Model Retraining**: `retrain_local.py` generates synthetic flows matched to your FlowTracker's feature scales and retrains the model without any external dataset.
+- **Heuristic Threat Engine**: five stateful rules in a 5-second sliding window — SYN Flood, UDP Flood, ICMP Flood, Port Scan, Blacklisted Port — all thresholds adjustable live from the Settings UI without a server restart.
+- **Real-Time Dashboard**: live packet rate, protocol distribution donut, traffic volume chart, top talkers — all pushed via SocketIO.
+- **Geo-IP World Map**: D3.js Natural Earth projection fully served locally, animated circles per resolved public IP, country breakdown table.
+- **Local Device Discovery**: passive LAN tracking — no ARP scans, no active probes. Resolves MAC → vendor and reverse-DNS hostname in background threads.
+- **Live Packet Feed**: virtual-scroll feed handles 50 000+ packets; filterable by protocol or IP; click any row for full payload modal.
+- **Attack Simulation**: `simulate.py` replays CICIDS-2017-style traffic against the local stack to validate both detection layers end-to-end.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Browser                                  │
-│  Dashboard │ Live Feed │ Geo Map │ Devices │ Logs │ Settings    │
-│                    ↕ HTTP + SocketIO (long-polling)              │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│                      Flask Application                           │
-│                                                                  │
-│  Routes (views.py)          SocketIO Event Handlers             │
-│  ├─ GET /                   ├─ connect / disconnect             │
-│  ├─ GET /feed               ├─ toggle_monitoring                │
-│  ├─ GET /nodes              ├─ get_all_connections              │
-│  ├─ GET /geo                ├─ resolve_geo / resolve_ip         │
-│  ├─ GET /logs               ├─ get_interfaces                   │
-│  ├─ GET /settings           ├─ start_capture / stop_capture     │
-│  └─ REST /api/*             └─ restart_session                  │
-│                                                                  │
-│  Background Threads                                              │
-│  ├─ PacketSniffer (Scapy)   → emit_packet() → SocketIO broadcast│
-│  ├─ SystemMonitor           → system_usage event every 2s       │
-│  └─ TopTalkersMonitor       → update_top_talkers every 2s       │
-│                                                                  │
-│  Per-Packet Pipeline                                             │
-│  Scapy → parse headers → ThreatEngine.analyze()                 │
-│              ↓                    ↓                             │
-│        log to SQLite      update TrafficStats + NodeStats        │
-│                                   ↓                             │
-│                     socketio.emit('new_packet')                  │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│                        Data Layer                                │
-│  SQLite (instance/threats.db)     In-Memory (Python)            │
-│  └─ threats table                 ├─ PACKET_BUFFER (deque 50K)  │
-│     auto-created on startup       ├─ TrafficStats (Counter)     │
-│                                   ├─ NODE_STATS (dict)          │
-│                                   └─ THREAT_IPS (set)           │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                          Browser                                │
+│  Dashboard │ Live Feed │ Geo Map │ Devices │ Logs │ Settings   │
+│                   ↕ HTTP + SocketIO (long-polling)              │
+└───────────────────────────┬────────────────────────────────────┘
+                            │
+┌───────────────────────────▼────────────────────────────────────┐
+│                     Flask Application                           │
+│                                                                 │
+│  Routes (views.py)           SocketIO Event Handlers           │
+│  ├─ REST /api/*              ├─ toggle_monitoring              │
+│  ├─ /api/ml/status           ├─ start_capture / stop_capture   │
+│  ├─ /api/ml/reload           ├─ get_all_connections            │
+│  ├─ /api/settings/detection  ├─ resolve_geo / resolve_ip       │
+│  └─ /api/settings/heuristic  └─ restart_session                │
+│                                                                 │
+│  Per-Packet Pipeline                                            │
+│  Scapy ──► parse headers ──► ThreatEngine.analyze()            │
+│                 │                     │                         │
+│           log to SQLite        FlowTracker.update()             │
+│                                       │                         │
+│                    (on flow complete) │                         │
+│                              MLEngine.classify_flow()           │
+│                                       │                         │
+│                      socketio.emit('new_packet' / 'threat_alert')
+└───────────────────────────┬────────────────────────────────────┘
+                            │
+┌───────────────────────────▼────────────────────────────────────┐
+│                        Data Layer                               │
+│  SQLite (instance/threats.db)    In-Memory (Python)            │
+│  └─ threats table                ├─ PACKET_BUFFER (deque 50K)  │
+│     auto-created on startup      ├─ PACKET_DETAIL_BUFFER (1K)  │
+│                                  ├─ FlowTracker (dict)         │
+│                                  ├─ TrafficStats (Counter)     │
+│                                  ├─ NODE_STATS (dict)          │
+│                                  └─ THREAT_IPS (set)           │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Design Decisions
-
-**Why SocketIO over WebSockets?**
-Flask's threading mode uses long-polling which works reliably alongside Scapy's background thread. Pure WebSocket upgrades cause session drops in the development server with `async_mode='threading'`, so `allow_upgrades=False` is set.
-
-**Why in-memory for packets?**
-SQLite writes on every packet would bottleneck at high traffic rates. The circular deque (`maxlen=50000`) gives O(1) append/evict with zero disk I/O.
-
-**Why Scapy over raw sockets?**
-Scapy handles Ethernet frame parsing, protocol dissection, and TCP flag extraction across IPv4/IPv6 in one call. Raw sockets would require reimplementing all of that, plus it handles both Linux and Windows capture transparently.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Packet Capture | [Scapy](https://scapy.net/) 2.7+ |
-| Web Framework | [Flask](https://flask.palletsprojects.com/) 3.x + Flask-SocketIO 5.x |
-| Real-Time Transport | SocketIO long-polling (`async_mode='threading'`) |
-| Database | SQLite 3 (built-in Python) |
-| Device Fingerprinting | [mac-vendor-lookup](https://pypi.org/project/mac-vendor-lookup/) |
-| System Metrics | [psutil](https://psutil.readthedocs.io/) |
-| Geo-IP | [ip-api.com](http://ip-api.com/) (free, no API key required) |
-| Frontend | HTML5 + Vanilla JS + [Tailwind CSS](https://tailwindcss.com/) (CDN) |
-| Charts | [Chart.js](https://www.chartjs.org/) (CDN) |
-| World Map | [D3.js](https://d3js.org/) v7 + [TopoJSON](https://github.com/topojson/topojson) (served locally) |
-| World Atlas Data | [world-atlas](https://www.npmjs.com/package/world-atlas) 110m resolution (served locally) |
-
----
-
-## Branches
-
-| Branch | Description |
-|--------|-------------|
-| `main` | Original Windows implementation — the starting point of the project |
-| `linux-implementation` | Full feature set — Linux/macOS compatible with all features added |
-
-**`linux-implementation` is the recommended branch.** The `main` branch is behind and is missing several features:
-
-| Feature | `main` (Windows) | `linux-implementation` |
-|---------|:-----------------:|:----------------------:|
-| Linux / macOS support | No | Yes |
-| ICMP Flood detection rule | No | Yes |
-| D3.js Geo-IP world map | No | Yes |
-| Nodes / Logs auto-refresh | No | Yes |
-| Interface selector in Settings | No | Yes |
-| `requests` dependency declared | No | Yes |
-
-### Switching branches
-
-```bash
-# Clone and switch to the full-featured branch
-git clone https://github.com/Gin5115/Sentinels
-cd Sentinels
-git checkout linux-implementation
-```
-
-> Windows users can stay on `main` and follow the original Windows setup, but the geo map, ICMP flood rule, and several UI features will not be present.
-
----
-
-## Installation
+## Quick Start
 
 ### Prerequisites
 
 | Platform | Requirement |
 |----------|------------|
-| Linux | `libpcap` (usually pre-installed), Python 3.8+, `sudo` |
+| Linux | `libpcap`, Python 3.8+, `sudo` |
 | macOS | `libpcap` (pre-installed), Python 3.8+, `sudo` |
-| Windows | [Npcap](https://npcap.com/) installed, Python 3.8+, Administrator shell |
+| Windows | [Npcap](https://npcap.com/), Python 3.8+, Administrator shell |
 
-### Setup
+### 1. Clone the repo
 
 ```bash
-# 1. Clone
-git clone https://github.com/Gin5115/Sentinels
+git clone https://github.com/Gin5115/Sentinels.git
 cd Sentinels
+git checkout linux-implementation
+```
 
-# 2. Create virtual environment
+### 2. Create virtual environment and install dependencies
+
+```bash
 python -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
-
-# 3. Install dependencies
 pip install -r requirements.txt
+```
 
-# 4. Run (root/admin required for raw packet access)
+### 3. (Optional) Train the ML model
+
+A pre-trained model is included. To retrain on your own traffic patterns:
+
+```bash
+python retrain_local.py
+# Trains Random Forest on synthetic CICIDS-2017-style flows
+# Saves model to app/ml/sentinels_rf_model.pkl
+```
+
+### 4. Run
+
+```bash
 sudo venv/bin/python run.py       # Linux / macOS
 python run.py                     # Windows (Administrator PowerShell)
 ```
 
-Open **http://localhost:5000** in your browser.
+Open **http://localhost:5000**.
 
-> The app auto-creates `instance/threats.db` on first run. No database setup needed.
+> SQLite database at `instance/threats.db` is auto-created on first run.
 
----
+### 5. (Optional) Simulate attacks for testing
 
-## Usage Guide
+```bash
+python simulate.py
+# Replays CICIDS-2017-style attack traffic against the local detection stack
+```
 
-### Starting a Capture Session
+## Configuration
 
-1. Open the dashboard at `http://localhost:5000`
-2. The **STATUS** indicator in the sidebar shows `Monitoring` when active
-3. Click **⏸** to pause without stopping the sniffer thread
-4. Click **↺** to clear all session data and restart fresh
+### Detection Mode (Settings UI or API)
 
-### Switching Network Interface
+| Mode | Behaviour |
+|------|-----------|
+| `heuristic` | Rule-based engine only |
+| `ml` | Random Forest only |
+| `both` | Both layers run in parallel (default) |
 
-1. Go to **Settings → Network Interface**
-2. Select from the dropdown (e.g. `wlo1`, `eth0`, `enp0s3`)
-3. Click **Apply** — the sniffer restarts on the new interface immediately
+Switch live via **Settings → Detection Mode** or `POST /api/settings/detection`.
 
-### Reading the Threat Logs
+### Heuristic Thresholds (Settings UI or API)
 
-- Every detected threat is logged with timestamp, source/destination IP, protocol, type, and severity
-- Click 👁 on any row to see the raw packet payload
-- Click 🔍 to deep-dive the source IP (packet history, geo, hostname)
-- Export all logs as **CSV** from Settings → Data Export
+All thresholds are runtime-adjustable from **Settings → Heuristic Thresholds** without a server restart.
 
-### Geo Map
+| Threshold | Default | Description |
+|-----------|---------|-------------|
+| `syn_flood_threshold` | 100 | SYN-only packets / 5 s from one IP |
+| `udp_flood_threshold` | 500 | UDP packets / 5 s from public IP |
+| `icmp_flood_threshold` | 300 | ICMP packets / 5 s from public IP |
+| `port_scan_threshold` | 10 | Unique destination ports / 5 s from one IP |
+| `window_duration` | 5.0 | Sliding window size (seconds) |
+| `alert_cooldown` | 5.0 | Minimum seconds between duplicate alerts |
 
-- **Green dots** = clean IPs
-- **Red dots** = IPs that triggered at least one threat alert
-- **Dot size** scales with packet volume relative to the busiest tracked IP
-- Public IPs resolve to lat/lon via ip-api.com — 8 per 5-second cycle
-- Click any dot or country row for a detailed breakdown popup
+### False Positive Mitigations
 
----
+| Rule | Mitigation |
+|------|-----------|
+| DNS servers (8.8.8.8, 1.1.1.1 etc.) flagged as port scanners | Added to trusted IP set; `src_port==53` responses skipped |
+| LAN service discovery (mDNS, SSDP) classified by ML | LAN↔LAN flows are skipped from ML inference |
+| Background app traffic (keepalives) triggering ML | Confidence threshold set to 60% minimum |
+| 172.20.x.x and similar RFC 1918 ranges not excluded | Full 172.16.0.0/12 range covered |
 
 ## API Reference
 
-All endpoints return JSON unless noted.
+### REST Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/packets` | Packet buffer. Params: `limit` (max 50000), `offset`, `ip` |
+| `GET` | `/api/packets` | Packet buffer. Params: `limit`, `offset`, `ip` |
 | `GET` | `/api/packet/<id>` | Full packet details including payload |
 | `GET` | `/api/threats` | Threat log. Params: `limit` |
-| `GET` | `/api/threats/export` | Download all threats as CSV file |
-| `POST` | `/api/threats/delete/<id>` | Delete a single threat record |
+| `GET` | `/api/threats/export` | Download all threats as CSV |
 | `POST` | `/api/threats/clear` | Wipe entire threat history |
 | `GET` | `/api/nodes` | Active LAN devices as JSON |
-| `GET` | `/api/geo/<ip>` | Resolve geo-location for any IP |
 | `GET` | `/api/threat/<id>` | Full threat record including payload |
+| `GET` | `/api/ml/status` | ML engine status (loaded, classes, model path) |
+| `POST` | `/api/ml/reload` | Reload model from disk without restart |
+| `GET` | `/api/settings/detection` | Get current detection mode |
+| `POST` | `/api/settings/detection` | Set detection mode (`heuristic` / `ml` / `both`) |
+| `GET` | `/api/settings/heuristic` | Get all heuristic thresholds |
+| `POST` | `/api/settings/heuristic` | Update one or more thresholds |
+| `GET` | `/api/debug/ml` | Classify last N flows and return raw scores |
 
 ### SocketIO Events
 
@@ -264,7 +186,7 @@ All endpoints return JSON unless noted.
 | `start_capture` | `{interface: string}` | Start on a specific interface |
 | `stop_capture` | — | Stop the sniffer |
 | `get_interfaces` | — | Request available network interfaces |
-| `get_all_connections` | — | Request full connection list with geo data |
+| `get_all_connections` | — | Full connection list with geo data |
 | `resolve_ip` | `{ip: string}` | Resolve IP to hostname/org |
 | `resolve_geo` | `{ip: string}` | Resolve IP to country/city/lat/lon |
 | `restart_session` | — | Clear all session data |
@@ -274,18 +196,44 @@ All endpoints return JSON unless noted.
 | Event | Payload | Description |
 |-------|---------|-------------|
 | `new_packet` | Lightweight packet metadata | Every captured packet |
-| `threat_alert` | Threat object | Threat detected |
+| `threat_alert` | Threat object | Threat detected (heuristic or ML) |
 | `init_stats` | Counter snapshot | Sent on connect to sync state |
 | `monitoring_status` | `{active, sniffer_running}` | Broadcast on state change |
-| `system_usage` | CPU / RAM / disk stats | Every 2 seconds |
+| `system_usage` | RAM / disk stats | Every 2 seconds |
 | `update_top_talkers` | Top 5 IP list | Every 2 seconds |
-| `interfaces_list` | List of interface dicts | Response to `get_interfaces` |
-| `ip_resolved` | `{ip, name}` | Async hostname result |
-| `geo_resolved` | `{ip, country, city, flag, lat, lon}` | Async geo result |
-| `all_connections_data` | Full connection list | Response to `get_all_connections` |
 | `session_restarted` | Reset stats object | Broadcast after session clear |
 
----
+## ML Detection Details
+
+### How Flows Are Built
+
+`FlowTracker` groups raw packets into bidirectional flows using a canonical key `(min(src,dst), max(src,dst), src_port, dst_port, protocol)`. When a flow finishes (FIN/RST or 30 s idle timeout), it extracts 20 CICIDS-2017 features and passes them to `MLEngine.classify_flow()`.
+
+### Features Used
+
+Flow Duration, Total Fwd/Bwd Packets, Fwd/Bwd Packet Length Max/Min/Mean/Std, Flow Bytes/s, Flow Packets/s, Flow IAT Mean/Std, Fwd IAT Mean/Std, SYN/FIN/RST/PSH/ACK Flag Counts, Average Packet Size, Down/Up Ratio.
+
+### Attack Classes & Confidence Targets
+
+| Class | Severity | Typical Confidence |
+|-------|----------|--------------------|
+| DoS | HIGH | ~68% |
+| PortScan | LOW | ~99% |
+| BruteForce | HIGH | ~94% |
+| Botnet | CRITICAL | ~90% |
+| WebAttack | MEDIUM | ~78% |
+| Infiltration | CRITICAL | varies |
+| Heartbleed | CRITICAL | varies |
+
+Minimum confidence threshold: **60%** — flows below this are silently dropped.
+
+### Retraining
+
+```bash
+python retrain_local.py
+```
+
+Generates 4 200 synthetic flows (1 200 Normal + 600 × 5 attack classes) using the same feature extraction logic as `FlowTracker`, so feature scales match exactly. Trains RF(n_estimators=200, max_depth=20, class_weight='balanced') and saves `app/ml/sentinels_rf_model.pkl`.
 
 ## Project Structure
 
@@ -294,15 +242,24 @@ Sentinels/
 ├── run.py                           # Entry point
 ├── config.py                        # Flask configuration
 ├── requirements.txt                 # Python dependencies
+├── retrain_local.py                 # Retrain RF model on synthetic flows
+├── train_model.py                   # Original training script (CICIDS-2017 CSV)
+├── simulate.py                      # Attack traffic simulation for testing
 │
 ├── app/
 │   ├── __init__.py                  # App factory, SocketIO init
 │   │
+│   ├── ml/
+│   │   └── sentinels_rf_model.pkl   # Pre-trained Random Forest bundle
+│   │
 │   ├── sniffer/
-│   │   └── capture.py               # PacketSniffer (Scapy), cross-platform interface detection
+│   │   └── capture.py               # PacketSniffer (Scapy), FlowTracker integration
 │   │
 │   ├── utils/
-│   │   ├── threat_engine.py         # 5-rule heuristic detection engine
+│   │   ├── threat_engine.py         # Heuristic detection, runtime-adjustable thresholds
+│   │   ├── ml_engine.py             # MLEngine wrapper around scikit-learn pipeline
+│   │   ├── flow_tracker.py          # Bidirectional flow assembly + feature extraction
+│   │   ├── detection_config.py      # Detection mode toggle (heuristic / ml / both)
 │   │   ├── stats_manager.py         # In-memory per-IP traffic counters
 │   │   └── ip_resolver.py           # Hostname + geo-IP resolution with caching
 │   │
@@ -311,19 +268,19 @@ Sentinels/
 │   │   └── nodes.py                 # LAN device tracking + MAC vendor lookup
 │   │
 │   ├── routes/
-│   │   └── views.py                 # HTTP routes + REST API endpoints
+│   │   └── views.py                 # HTTP routes, REST API, ML + settings endpoints
 │   │
 │   ├── events/
-│   │   └── socket_events.py         # All SocketIO event handlers + background threads
+│   │   └── socket_events.py         # SocketIO handlers, PACKET_BUFFER, background threads
 │   │
 │   ├── templates/
 │   │   ├── base.html                # Sidebar, nav, system resource monitor
 │   │   ├── index.html               # Dashboard (stats cards, charts, top talkers)
 │   │   ├── feed.html                # Live packet feed with filtering
 │   │   ├── nodes.html               # Local LAN devices
-│   │   ├── geo.html                 # D3 geo-IP world map
-│   │   ├── logs.html                # Threat history table
-│   │   └── settings.html            # Interface selector, export, database management
+│   │   ├── geo.html                 # D3 geo-IP world map + country breakdown
+│   │   ├── logs.html                # Threat history table (heuristic + ML)
+│   │   └── settings.html            # Interface, detection mode, heuristic thresholds
 │   │
 │   └── static/
 │       ├── css/style.css
@@ -333,7 +290,7 @@ Sentinels/
 │       │   ├── geo.js               # D3 world map, popups, geo resolution
 │       │   ├── nodes.js             # 5s auto-refresh for device cards
 │       │   ├── logs.js              # Threat table + 5s auto-refresh
-│       │   ├── settings.js          # Interface selector + export handlers
+│       │   ├── settings.js          # Interface selector, detection mode, threshold UI
 │       │   ├── ip-details.js        # IP deep-dive side panel
 │       │   ├── d3.min.js            # D3.js v7 (local, no CDN)
 │       │   └── topojson-client.min.js
@@ -344,87 +301,177 @@ Sentinels/
     └── threats.db                   # SQLite (auto-created on first run)
 ```
 
----
+## Tech Stack
 
-## Threat Detection Details
+| Component | Technology |
+|-----------|-----------|
+| Packet Capture | [Scapy](https://scapy.net/) 2.7+ |
+| Web Framework | [Flask](https://flask.palletsprojects.com/) 3.x + Flask-SocketIO 5.x |
+| Real-Time Transport | SocketIO long-polling (`async_mode='threading'`) |
+| ML Model | [scikit-learn](https://scikit-learn.org/) RandomForestClassifier + LabelEncoder |
+| ML Persistence | [joblib](https://joblib.readthedocs.io/) |
+| Feature Engineering | [NumPy](https://numpy.org/) |
+| Database | SQLite 3 (built-in Python) |
+| Device Fingerprinting | [mac-vendor-lookup](https://pypi.org/project/mac-vendor-lookup/) |
+| System Metrics | [psutil](https://psutil.readthedocs.io/) |
+| Geo-IP | [ip-api.com](http://ip-api.com/) (free, no API key) |
+| Frontend | HTML5 + Vanilla JS + [Tailwind CSS](https://tailwindcss.com/) (CDN) |
+| Charts | [Chart.js](https://www.chartjs.org/) (CDN) |
+| World Map | [D3.js](https://d3js.org/) v7 + TopoJSON (served locally) |
 
-### How the Engine Works
+## Replicating on Another Machine
 
-Every captured packet passes through two stages:
+Full step-by-step for getting Sentinels running on a fresh machine from scratch.
 
-**Stage 1 — Rule-based** (`capture.py`): immediate single-packet check.
-Example: bare SYN flag + packet size < 60 bytes → possible SYN scan.
+### Step 1 — Install system dependencies
 
-**Stage 2 — Heuristic engine** (`threat_engine.py`): stateful 5-second sliding window per source IP. Counters reset every 5 seconds. A cooldown (`_recent_alerts`, 5s) prevents duplicate alerts for the same IP.
-
-Private IPs (RFC 1918, loopback, link-local, IPv6 ULA) are exempt from all flood detection rules.
-
-### Tuning Thresholds
-
-Edit `app/utils/threat_engine.py`:
-
-```python
-SYN_FLOOD_THRESHOLD  = 100   # lower = more sensitive
-UDP_FLOOD_THRESHOLD  = 500   # raise if seeing false positives on media streams
-ICMP_FLOOD_THRESHOLD = 300   # raise if network monitoring generates lots of pings
-PORT_SCAN_THRESHOLD  = 10    # lower = detect slower/stealthier scans
+**Ubuntu / Debian**
+```bash
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv git libpcap-dev
 ```
 
-### Adding a Custom Rule
-
-Add a new block inside `ThreatEngine.analyze_packet()`:
-
-```python
-# === Rule N: Your Custom Rule ===
-if <condition>:
-    with self._lock:
-        self._my_track[src_ip] += 1
-        count = self._my_track[src_ip]
-    if count > self.MY_THRESHOLD:
-        threat_key = f"my_rule:{src_ip}"
-        if self._should_alert(threat_key):
-            return {
-                'type':        'My Threat Type',
-                'ip':          src_ip,
-                'severity':    self.SEVERITY_HIGH,
-                'description': f'Description with {count} as context',
-            }
+**Fedora / RHEL / Rocky**
+```bash
+sudo dnf install -y python3 python3-pip git libpcap-devel
 ```
 
-Remember to also add tracking in `__init__`, `_reset_window`, `get_stats`, and `clear`.
+**macOS**
+```bash
+# libpcap is pre-installed. Install Python via Homebrew if needed:
+brew install python git
+```
+
+**Windows**
+1. Install [Python 3.8+](https://www.python.org/downloads/) (check "Add to PATH")
+2. Install [Git](https://git-scm.com/download/win)
+3. Install [Npcap](https://npcap.com/) — required for raw packet capture
 
 ---
 
-## Limitations
-
-- **Development server only** — not production-grade. For deployment use Gunicorn + gevent.
-- **WebSocket upgrades disabled** — `allow_upgrades=False` because Scapy threading conflicts with WebSocket upgrades. Long-polling is reliable and sufficient.
-- **Geo-IP requires internet** — public IPs show as "Unknown" on air-gapped networks.
-- **IPv6 partial support** — packets are captured and classified but geo and node tracking are IPv4-focused.
-- **Single interface** — the sniffer binds to one interface at a time.
-
----
-
-## Linux Quick Reference
+### Step 2 — Clone the repository
 
 ```bash
-# Start
-sudo venv/bin/python run.py
+git clone https://github.com/Gin5115/Sentinels.git
+cd Sentinels
+git checkout linux-implementation
+```
 
-# List interfaces
-ip link show
+The pre-trained ML model (`app/ml/sentinels_rf_model.pkl`) is included in the repo — no separate download needed.
 
-# Install libpcap if missing
-sudo apt install libpcap-dev        # Debian/Ubuntu
-sudo dnf install libpcap-devel      # Fedora/RHEL
+---
 
-# Grant raw socket capability instead of running as root
-sudo setcap cap_net_raw+ep venv/bin/python
-venv/bin/python run.py
+### Step 3 — Create virtual environment
+
+```bash
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 ```
 
 ---
+
+### Step 4 — Install Python dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+This installs Flask, Scapy, scikit-learn, numpy, joblib, psutil, and all other dependencies listed in `requirements.txt`.
+
+---
+
+### Step 5 — Run
+
+```bash
+# Linux / macOS — root required for raw packet access
+sudo venv/bin/python run.py
+
+# Windows — run from an Administrator PowerShell
+python run.py
+```
+
+Open **http://localhost:5000** in a browser.
+
+If you want the dashboard accessible from other devices on your network, it's already bound to `0.0.0.0:5000` — just open `http://<this-machine-ip>:5000` from any other device.
+
+---
+
+### Step 6 — (Optional) Retrain the ML model
+
+The included model was trained on synthetic CICIDS-2017 flows. If you want to retrain it to match your own network's traffic patterns:
+
+```bash
+python retrain_local.py
+```
+
+This takes about 30 seconds and overwrites `app/ml/sentinels_rf_model.pkl`.
+
+---
+
+### Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `Permission denied` on Linux | Run with `sudo venv/bin/python run.py` |
+| `No module named 'scapy'` | Virtual environment not activated — run `source venv/bin/activate` first |
+| `libpcap not found` | Install `libpcap-dev` (Debian) or `libpcap-devel` (Fedora) |
+| Dashboard loads but no packets | Wrong interface selected — go to **Settings → Network Interface** and pick the correct one |
+| Port 5000 blocked from other devices | Open it: `sudo ufw allow 5000/tcp` (Ubuntu) or `sudo firewall-cmd --add-port=5000/tcp --permanent && sudo firewall-cmd --reload` (Fedora) |
+| `eventlet` error on Python 3.12+ | Run `pip install eventlet==0.36.1` to get the version with 3.12 fixes |
+
+---
+
+## Accessing from Another Machine
+
+Sentinels binds to `0.0.0.0:5000` by default, so the dashboard is reachable from any device on your network — not just the machine running it.
+
+### Setup
+
+1. **Run on the monitoring machine** (the one doing packet capture) as normal:
+
+   ```bash
+   sudo venv/bin/python run.py
+   ```
+
+2. **Open from another device** on the same network:
+
+   ```
+   http://<monitoring-machine-ip>:5000
+   ```
+
+   Find the monitoring machine's IP with:
+
+   ```bash
+   ip addr show        # Linux
+   ipconfig            # Windows
+   ```
+
+3. **Allow the port through the firewall** if the dashboard doesn't load:
+
+   ```bash
+   # Fedora / RHEL
+   sudo firewall-cmd --add-port=5000/tcp --permanent
+   sudo firewall-cmd --reload
+
+   # Ubuntu / Debian
+   sudo ufw allow 5000/tcp
+   ```
+
+> **Note**: packet capture still runs on the monitoring machine only — the remote browser is just viewing the dashboard. Whoever opens `http://<ip>:5000` sees the same live data.
+
+## Branches
+
+| Branch | Description |
+|--------|-------------|
+| `main` | Original Windows implementation |
+| `linux-implementation` | Full feature set — Linux/macOS, ML engine, all UI features |
+
+**`linux-implementation` is the recommended branch.**
+
+## Disclaimer
+
+This tool is for **educational and research purposes only**. Packet capture requires root/administrator privileges and should only be used on networks you own or have explicit permission to monitor. The authors are not responsible for any misuse.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
